@@ -29,32 +29,159 @@ const RelyingParty = require('oidc-rp')
 
 class ClientAuthOIDC {
   constructor () {
-    this.rp = null
+    this.accessToken = null
+    this.currentClient = null
     this.providerUri = null
-  }
-
-  keyByProvider () {
-    return `oidc.rp.by-provider.${this.providerUri}`
-  }
-
-  keyByState () {
-    return `oidc.rp.by-state.${this.state}`
-  }
-
-  get client () {
-    // If one is already initialized, return it
-    if (this.rp) {
-      return this.rp
+    this.webId = null
+    this.defaultCallbacks = {
+      onLoginSuccess: (webId, accessToken) => {
+        console.log('onLoginSuccess() callback! webId: ', webId,
+          'access_token: ', accessToken)
+      },
+      onProviderSelected: (providerUri) => {
+        console.log('onProviderSelected() callback! providerUri: ', providerUri)
+      }
     }
-    // Check to see if there's already a registered client in local storage
-    if (this.providerUri) {
-      return localStorage.getItem(this.keyByProvider())
+    this.callbacks = {}
+  }
+
+  detectAuthCallback () {
+    let currentUri = window.location.href
+    let state = this.extractState(currentUri, 'hash')
+    if (!state) { return }
+    console.log('Auth callback detected. Loading provider by state: ', state)
+    let providerUri = this.loadProvider(state)
+    if (!providerUri) {
+      console.error('Auth callback detected, but no provider stored for state!')
+      return
+    }
+    console.log('Provider loaded from state: ', providerUri, '. Loading client.')
+    this.dispatchProviderSelected(providerUri)
+    return this.loadOrRegisterClient(providerUri)
+      .then(client => {
+        if (!client) { return }
+        console.log('Loaded client: ', client.registration.client_id)
+        console.log('Validating auth response...')
+        return client.validateResponse(currentUri, localStorage)
+      })
+      .then(response => {
+        console.log('Validated auth response: ', response)
+        let webId = response.decoded.payload.sub
+        let accessToken = response.params.access_token
+        return this.dispatchLoginSuccess(webId, accessToken)
+      })
+  }
+
+  dispatchLoginSuccess (webId, accessToken) {
+    this.webId = webId
+    this.accessToken = accessToken
+    let callback = this.callbacks.onLoginSuccess ||
+      this.defaultCallbacks.onLoginSuccess
+    if (callback) {
+      callback.bind(this)
+      callback(webId, accessToken)
+    } else {
+      throw new Error('onLoginSuccess() callback not found')
     }
   }
 
-  set client (rp) {
-    this.rp = rp
-    localStorage.setItem(this.keyByProvider(), rp.serialize())
+  dispatchProviderSelected (providerUri) {
+    this.providerUri = providerUri
+    let callback = this.callbacks.onProviderSelected ||
+      this.defaultCallbacks.onProviderSelected
+    if (callback) {
+      callback.bind(this)
+      callback(providerUri)
+    } else {
+      throw new Error('onProviderSelected() callback not found')
+    }
+  }
+
+  /**
+   * Extracts and returns the `state` query or hash fragment param from a uri
+   * @param uri {string}
+   * @param uriType {string} 'hash' or 'query'
+   * @return {string} Value of the `state` query or hash fragment param
+   */
+  extractState (uri, uriType = 'hash') {
+    if (!uri) { return }
+    let uriObj = new URL(uri)
+    let state
+    if (uriType === 'hash') {
+      let hash = uriObj.hash || '#'
+      let params = new URLSearchParams(hash.substr(1))
+      state = params.get('state')
+    }
+    if (uriType === 'query') {
+      state = uriObj.searchParams.get('state')
+    }
+    return state
+  }
+
+  keyByProvider (providerUri = this.providerUri) {
+    return `oidc.rp.by-provider.${providerUri}`
+  }
+
+  keyByState (state) {
+    return `oidc.rp.by-state.${state}`
+  }
+
+  /**
+   * @param providerUri {string}
+   * @return {Promise<RelyingParty>}
+   */
+  loadOrRegisterClient (providerUri) {
+    if (this.currentClient) {
+      console.log('currentClient cached, returning')
+      return Promise.resolve(this.currentClient)
+    }
+    // Check for client config stored locally
+    let key = this.keyByProvider(providerUri)
+    let clientConfig = localStorage.getItem(key)
+    if (clientConfig) {
+      console.log('client config stored locally for ', providerUri)
+      clientConfig = JSON.parse(clientConfig)
+      return RelyingParty.from(clientConfig)
+    } else {
+      console.log('client config not stored, proceeding to register client')
+      // Client not stored. Register it and store it
+      return this.registerClient(providerUri)
+        .then(client => {
+          this.storeClient(client, providerUri)
+          return client
+        })
+    }
+  }
+
+  loadProvider (state) {
+    let key = this.keyByState(state)
+    let providerUri = localStorage.getItem(key)
+    return providerUri
+  }
+
+  /**
+   * @param providerUri {string}
+   * @param client {RelyingParty}
+   * @param method {string} 'redirect' or 'popup'
+   * @return {Promise} Creates auth request uri, stores state & nonce, and
+   *   dispatches the auth request according to `method`.
+   */
+  login (providerUri, client, method = 'redirect') {
+    if (!client) {
+      throw new TypeError('Cannot login(), missing client')
+    }
+    return client.createRequest({}, localStorage)
+      .then(authUri => {
+        console.log('login()>createRequest()>url: ', authUri)
+        let state = this.extractState(authUri, 'query')
+        if (!state) {
+          throw new Error('login() - could not extract state param')
+        }
+        this.saveProviderByState(providerUri, state)
+        if (method === 'redirect') {
+          window.location = authUri
+        }
+      })
   }
 
   /**
@@ -67,14 +194,8 @@ class ClientAuthOIDC {
    * @throws {TypeError} If providerUri is missing
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
-  register (providerUri, options = {}) {
+  registerClient (providerUri, options = {}) {
     return this.registerPublicClient(providerUri, options)
-      .then(client => {
-        this.rp = client
-        localStorage.setItem('oidc.clients.'+providerUri, client.serialize())
-        this.client_id = client.registration.client_id
-        console.log('registered client:', client)
-      })
       .catch(error => {
         console.error('Error while registering:', error)
       })
@@ -91,8 +212,9 @@ class ClientAuthOIDC {
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
   registerPublicClient (providerUri, options = {}) {
+    console.log('Registering public client...')
     if (!providerUri) {
-      throw TypeError('Cannot register auth client, missing providerUri')
+      throw new TypeError('Cannot registerClient auth client, missing providerUri')
     }
     let redirectUri = options.redirectUri || window.location.href
     this.redirectUri = redirectUri
@@ -115,5 +237,40 @@ class ClientAuthOIDC {
     return RelyingParty
       .register(providerUri, registration, rpOptions)
   }
+
+  onMessage (event) {
+    console.log('Auth client received event: ', event)
+    if (!event || !event.data) { return }
+    switch (event.data.event_type) {
+      case 'providerSelected':
+        this.selectProvider(event.data.value)
+        break
+      default:
+        console.error('onMessage - unknown event type: ', event)
+        break
+    }
+  }
+
+  saveProviderByState (providerUri, state) {
+    let key = this.keyByState(state)
+    localStorage.setItem(key, providerUri)
+  }
+
+  selectProvider (providerUri, loginMethod = 'redirect') {
+    this.dispatchProviderSelected(providerUri)
+    this.loadOrRegisterClient(providerUri)
+      .then(client => {
+        console.log('Obtained registered client. Proceeding to login().')
+        return this.login(providerUri, client, loginMethod)
+      })
+  }
+
+  storeClient (client, providerUri) {
+    this.currentClient = client
+    // this.clientId = currentClient.registration.client_id
+    localStorage.setItem(this.keyByProvider(providerUri), client.serialize())
+  }
 }
+
 module.exports = ClientAuthOIDC
+

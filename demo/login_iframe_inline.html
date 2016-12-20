@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
+  <script type="text/javascript">
+    var parent, pageUrl
+    window.addEventListener('load', function () { init() });
+
+    function init () {
+      parent = window.parent
+//      console.log('Frame parent: ', parent)
+      pageUrl = parent.window.location.href
+//      console.log('Parent url: ', pageUrl)
+//      console.log('Parent origin: ', parent.window.location.origin)
+//      console.log('iFrame origin: ', window.location.origin)
+//      var pageOrigin = opener.location.origin;
+//      opener.postMessage(pageUrl, pageOrigin);
+      initEvents()
+    }
+    function initButton(id, action) {
+      document.getElementById(id).addEventListener('click', action)
+    }
+    function initEvents () {
+      initButton('local_provider',
+        function () { selectProvider('https://ldnode.local:8443') })
+      initButton('db_provider',
+        function () { selectProvider('https://databox2.com') })
+    }
+    function selectProvider (providerUri) {
+      console.log('Provider selected: ', providerUri)
+      var message = {
+        event_type: 'providerSelected',
+        value: providerUri
+      }
+      parent.postMessage(message, parent.window.location.origin)
+    }
+    function setField (id, value) {
+      var field = document.getElementById(id)
+      if (field) {
+        field.innerHTML = value
+      }
+    }
+    function hide (id) {
+      document.getElementById(id).className = 'hidden'
+    }
+    function show (id) {
+      var div = document.getElementById(id)
+      div.className = div.className.replace('hidden', '')
+    }
+  </script>
+</head>
+<body>
+<div class="container">
+  <div class="row">
+    <div class="col-sm-2"><strong>Login with:</strong></div>
+    <div class="col-sm-1">
+      <button type="button" class="btn btn-xs btn-primary" id="local_provider">
+        localhost
+      </button>
+    </div>
+    <div class="col-sm-2">
+      <button type="button" class="btn btn-xs btn-primary" id="db_provider">
+        databox2.com
+      </button>
+    </div>
+    <div class="col-sm-7">
+      or custom:
+      <input type="text" id="custom_provider" value="" placeholder="databox.me" />
+    </div>
+  </div>
+</div>
+</body>
+</html>

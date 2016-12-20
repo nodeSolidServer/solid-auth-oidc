@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solid Auth Test Page</title>
+  <!-- Bootstrap CSS and Theme for demo purposes -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
+  <!-- Solid Demo template/stylesheet -->
+  <link rel="stylesheet" href="./demo.css" />
+  <!-- Relying Party lib, exports a global var: SolidAuth -->
+  <script src="../dist/solid-auth-oidc.min.js"></script>
+</head>
+<body>
+<div class="container">
+  <div>
+    <h3>Solid Auth Demo Page</h3>
+  </div>
+  <div class="demo-section" style="width: 100%;">
+    <p>Option 1: Login on the same page (in iframe), allow main window redirect.</p>
+    <iframe id="solidLogin" src="login_iframe_inline.html" seamless style="width: 100%; border: none; margin-top: 1em;"></iframe>
+  </div>
+  <div class="demo-section">
+    <h5>App body</h5>
+    <p>The rest of the app goes here</p>
+  </div>
+</div>
+</body>
+<script>
+  var auth = new SolidAuth()
+
+  document.addEventListener('DOMContentLoaded', function () { init() })
+
+  function init () {
+    window.addEventListener('message', auth.onMessage.bind(auth))
+    auth.detectAuthCallback()
+  }
+</script>
+</html>
