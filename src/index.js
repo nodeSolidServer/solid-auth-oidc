@@ -70,6 +70,13 @@ class ClientAuthOIDC {
         let accessToken = response.params.access_token
         return this.dispatchLoginSuccess(webId, accessToken)
       })
+      .catch(error => {
+        if (error.message === 'Cannot resolve signing key for ID Token.') {
+          console.error('ID Token found, but could not validate. Provider likely has changed their public keys. Not signed in.')
+        } else {
+          throw error
+        }
+      })
   }
 
   dispatchLoginSuccess (webId, accessToken) {
