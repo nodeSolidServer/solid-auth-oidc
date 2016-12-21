@@ -24,6 +24,16 @@
   <div class="demo-section">
     <h5>App body</h5>
     <p>The rest of the app goes here</p>
+    <div class="container">
+      <div class="row">
+        <div class="col-md-1 text-right"><code>webId</code></div>
+        <div class="col-md-11"><code id="webId"></code></div>
+      </div>
+      <div class="row">
+        <div class="col-md-1 text-right"><code>provider</code></div>
+        <div class="col-md-11"><code id="providerUri"></code></div>
+      </div>
+    </div>
   </div>
 </div>
 </body>
@@ -39,8 +49,26 @@
       onLoginSuccess: function (webId, accessToken) {
         console.log('onLoginSuccess() callback! webId: ', webId,
           'access_token: ', accessToken)
+        setField('webId', webId)
+      },
+      onProviderSelected: function (providerUri) {
+        setField('providerUri', providerUri)
       }
     })
   })
+
+  function setField (id, value) {
+    var field = document.getElementById(id)
+    if (field) {
+      field.innerHTML = value
+    }
+  }
+  function hide (id) {
+    document.getElementById(id).className = 'hidden'
+  }
+  function show (id) {
+    var div = document.getElementById(id)
+    div.className = div.className.replace('hidden', '')
+  }
 </script>
 </html>
