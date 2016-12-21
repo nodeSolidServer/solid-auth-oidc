@@ -5,3 +5,7 @@
 A Javascript authentication plugin for
 [`solid-client`](https://github.com/solid/solid-client) based on OAuth2/OpenID
 Connect.
+
+This is an Authentication helper library that wraps an OpenID Connect (OIDC)
+Relying Party library, [`oidc-rp`](https://github.com/anvilresearch/oidc-rp).
+It is meant to be used in browser-side applications, as part of `solid-client`.

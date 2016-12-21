@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Solid Auth Test Page</title>
+  <title>Solid Auth Demo App</title>
   <!-- Bootstrap CSS and Theme for demo purposes -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
   <!-- Solid Demo template/stylesheet -->
@@ -17,7 +17,8 @@
     <h3>Solid Auth Demo Page</h3>
   </div>
   <div class="demo-section" style="width: 100%;">
-    <p>Option 1: Login on the same page (in iframe), allow main window redirect.</p>
+    <p>Login Option 1: Login on the same page (in iframe), allow main window
+      redirect.</p>
     <iframe id="solidLogin" src="login_iframe_inline.html" seamless style="width: 100%; border: none; margin-top: 1em;"></iframe>
   </div>
   <div class="demo-section">
@@ -27,13 +28,19 @@
 </div>
 </body>
 <script>
-  var auth = new SolidAuth()
+  var solid = { auth: new SolidAuth() }
 
-  document.addEventListener('DOMContentLoaded', function () { init() })
-
-  function init () {
-    window.addEventListener('message', auth.onMessage.bind(auth))
-    auth.detectAuthCallback()
-  }
+  // Using a standard "document loaded" event listener
+  //  (equivalent to jQuery's $(document).ready()
+  document.addEventListener('DOMContentLoaded', function () {
+    // Init the solid auth helper, inject whatever behavior you want to happen
+    //   when authentication succeeds.
+    solid.auth.init({
+      onLoginSuccess: function (webId, accessToken) {
+        console.log('onLoginSuccess() callback! webId: ', webId,
+          'access_token: ', accessToken)
+      }
+    })
+  })
 </script>
 </html>

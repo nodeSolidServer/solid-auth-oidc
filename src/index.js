@@ -118,6 +118,12 @@ class ClientAuthOIDC {
     return state
   }
 
+  init (callbacks = {}) {
+    this.callbacks = callbacks
+    window.addEventListener('message', this.onMessage.bind(this))
+    this.detectAuthCallback()
+  }
+
   keyByProvider (providerUri = this.providerUri) {
     return `oidc.rp.by-provider.${providerUri}`
   }
