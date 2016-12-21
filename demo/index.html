@@ -9,7 +9,7 @@
   <!-- Solid Demo template/stylesheet -->
   <link rel="stylesheet" href="./demo.css" />
   <!-- Relying Party lib, exports a global var: SolidAuth -->
-  <script src="../dist/solid-auth-oidc.min.js"></script>
+  <script src="./client/solid-client.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -26,41 +26,115 @@
     <p>The rest of the app goes here</p>
     <div class="container">
       <div class="row">
-        <div class="col-md-1 text-right"><code>webId</code></div>
-        <div class="col-md-11"><code id="webId"></code></div>
+        <div class="col-md-1 text-right"><strong>WebId</strong></div>
+        <div class="col-md-4"><code id="webId"></code></div>
+        <div class="col-md-7">
+          <div id="noWebId">Not signed in</div>
+          <div id="logoutDiv" class="hidden">
+            <button type="button" id="logoutBtn" class="btn btn-primary btn-xs">Log out</button>
+          </div>
+        </div>
       </div>
       <div class="row">
-        <div class="col-md-1 text-right"><code>provider</code></div>
+        <div class="col-md-1 text-right"><strong>provider</strong></div>
         <div class="col-md-11"><code id="providerUri"></code></div>
+      </div>
+      <br /><br />
+      <div class="row" id="getRootAclDiv" class="hidden">
+        <div class="col-md-2">
+          <button type="button" id="getRootAcl" class="btn btn-primary btn-md">
+            Get Root .acl
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <code id="rootAclContents" class="hidden"></code>
+        </div>
       </div>
     </div>
   </div>
 </div>
 </body>
 <script>
-  var solid = { auth: new SolidAuth() }
 
   // Using a standard "document loaded" event listener
   //  (equivalent to jQuery's $(document).ready()
   document.addEventListener('DOMContentLoaded', function () {
     // Init the solid auth helper, inject whatever behavior you want to happen
     //   when authentication succeeds.
-    solid.auth.init({
+    SolidClient.auth.init({
       onLoginSuccess: function (webId, accessToken) {
-        console.log('onLoginSuccess() callback! webId: ', webId,
-          'access_token: ', accessToken)
-        setField('webId', webId)
+        loginSuccess(webId, accessToken)
       },
       onProviderSelected: function (providerUri) {
-        setField('providerUri', providerUri)
+        providerSelected(providerUri)
       }
     })
+    init()
   })
+
+  function init () {
+    initButton('getRootAcl', getRootAcl)
+    initButton('logoutBtn', logout)
+  }
+  function initButton(id, action) {
+    document.getElementById(id).addEventListener('click', action)
+  }
+  function loginSuccess (webId, accessToken) {
+    console.log('onLoginSuccess() callback! webId: ', webId,
+      'access_token: ', accessToken)
+    hide('noWebId')
+    show('logoutDiv')
+    setField('webId', webId)
+    show('getRootAclDiv')
+  }
+
+  function logout () {
+    alert('logging out')
+  }
+
+  function getRootAcl () {
+    var currentWebId = SolidClient.auth.webId
+    if (!currentWebId) {
+      setFieldText('rootAclContents', '')
+      console.log('Cannot fetch root acl - user not signed in')
+      return
+    }
+    var aclUri = rootAclUri(currentWebId)
+    console.log('Fetching root acl: ', aclUri)
+    SolidClient.web.get(aclUri)
+      .then(function (result) {
+        show('rootAclContents')
+        setFieldText('rootAclContents', result.raw())
+      })
+  }
+
+  function rootAclUri (webId) {
+    var uri = new URL(webId)
+    uri.pathname = '/.acl'
+    uri.hash = ''
+    return uri.href
+  }
+
+  function providerSelected (providerUri) {
+    setField('webId', '')
+    hide('logoutDiv')
+    hide('getRootAclDiv')
+    show('noWebId')
+    setField('providerUri', providerUri)
+  }
 
   function setField (id, value) {
     var field = document.getElementById(id)
     if (field) {
       field.innerHTML = value
+    }
+  }
+  function setFieldText (id, value) {
+    var field = document.getElementById(id)
+    if (field) {
+      field.innerText = value
     }
   }
   function hide (id) {
