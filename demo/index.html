@@ -59,18 +59,16 @@
 <script>
 
   // Using a standard "document loaded" event listener
-  //  (equivalent to jQuery's $(document).ready()
+  //  (equivalent to jQuery's $(document).ready())
+  // Trigger a login() check on page load, in case user is logged in already
   document.addEventListener('DOMContentLoaded', function () {
-    // Init the solid auth helper, inject whatever behavior you want to happen
-    //   when authentication succeeds.
-    SolidClient.auth.init({
-      onLoginSuccess: function (webId, accessToken) {
+    SolidClient.auth.login()
+      .then(function (webId, accessToken) {
         loginSuccess(webId, accessToken)
-      },
-      onProviderSelected: function (providerUri) {
-        providerSelected(providerUri)
-      }
-    })
+      })
+      .catch(function (error) {
+        console.error('Error logging in:', error)
+      })
     init()
   })
 
@@ -81,9 +79,8 @@
   function initButton(id, action) {
     document.getElementById(id).addEventListener('click', action)
   }
-  function loginSuccess (webId, accessToken) {
-    console.log('onLoginSuccess() callback! webId: ', webId,
-      'access_token: ', accessToken)
+  function loginSuccess (webId) {
+    console.log('onLoginSuccess() callback! webId: ', webId)
     hide('noWebId')
     show('logoutDiv')
     setField('webId', webId)

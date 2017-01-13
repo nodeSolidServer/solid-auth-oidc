@@ -1,7 +1,7 @@
 /*
  The MIT License (MIT)
 
- Copyright (c) 2016 Solid
+ Copyright (c) 2016-17 Solid
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -27,108 +27,63 @@
 'use strict'
 const RelyingParty = require('oidc-rp')
 
+// URI parameter types
+const HASH = 'hash'
+const QUERY = 'query'
+
+// AuthenticationRequest sending methods
+const REDIRECT = 'redirect'
+
 class ClientAuthOIDC {
-  constructor () {
-    this.accessToken = null
+  /**
+   * @constructor
+   * @param [options={}]
+   * @param [options.window=Window] Optionally inject global browser window
+   * @param [options.localStorage=localStorage] Optionally inject localStorage
+   */
+  constructor (options = {}) {
+    this.window = options.window || window
+    this.localStorage = options.localStorage || localStorage
     this.currentClient = null
     this.providerUri = null
     this.webId = null
-    this.defaultCallbacks = {
-      onLoginSuccess: (webId, accessToken) => {
-        console.log('onLoginSuccess() callback! webId: ', webId,
-          'access_token: ', accessToken)
-      },
-      onProviderSelected: (providerUri) => {
-        console.log('onProviderSelected() callback! providerUri: ', providerUri)
-      }
-    }
-    this.callbacks = {}
+    this.idToken = null
+    this.accessToken = null
+    this.method = REDIRECT  // only redirect is currently supported
   }
 
-  detectAuthCallback () {
-    let currentUri = window.location.href
-    let state = this.extractState(currentUri, 'hash')
-    if (!state) { return }
-    console.log('Auth callback detected. Loading provider by state: ', state)
-    let providerUri = this.loadProvider(state)
-    if (!providerUri) {
-      console.error('Auth callback detected, but no provider stored for state!')
-      return
-    }
-    console.log('Provider loaded from state: ', providerUri, '. Loading client.')
-    this.dispatchProviderSelected(providerUri)
-    return this.loadOrRegisterClient(providerUri)
-      .then(client => {
-        if (!client) { return }
-        console.log('Loaded client: ', client.registration.client_id)
-        console.log('Validating auth response...')
-        return client.validateResponse(currentUri, localStorage)
-      })
-      .then(response => {
-        console.log('Validated auth response: ', response)
-        let webId = response.decoded.payload.sub
-        let accessToken = response.params.access_token
-        return this.dispatchLoginSuccess(webId, accessToken)
-      })
-      .catch(error => {
-        if (error.message === 'Cannot resolve signing key for ID Token.') {
-          console.error('ID Token found, but could not validate. Provider likely has changed their public keys. Not signed in.')
-        } else {
-          throw error
-        }
-      })
+  initEventListeners (window) {
+    window.addEventListener('message', this.onMessage.bind(this))
   }
 
-  dispatchLoginSuccess (webId, accessToken) {
-    this.webId = webId
-    this.accessToken = accessToken
-    let callback = this.callbacks.onLoginSuccess ||
-      this.defaultCallbacks.onLoginSuccess
-    if (callback) {
-      callback.bind(this)
-      callback(webId, accessToken)
-    } else {
-      throw new Error('onLoginSuccess() callback not found')
-    }
-  }
-
-  dispatchProviderSelected (providerUri) {
-    this.providerUri = providerUri
-    let callback = this.callbacks.onProviderSelected ||
-      this.defaultCallbacks.onProviderSelected
-    if (callback) {
-      callback.bind(this)
-      callback(providerUri)
-    } else {
-      throw new Error('onProviderSelected() callback not found')
-    }
+  /**
+   * Returns the current window's URI
+   * @return {string}
+   */
+  currentLocation () {
+    let window = this.window
+    return window.location.href
   }
 
   /**
    * Extracts and returns the `state` query or hash fragment param from a uri
    * @param uri {string}
-   * @param uriType {string} 'hash' or 'query'
-   * @return {string} Value of the `state` query or hash fragment param
+   * @param uriType {string} 'hash' or QUERY
+   * @return {string|null} Value of the `state` query or hash fragment param
    */
-  extractState (uri, uriType = 'hash') {
-    if (!uri) { return }
+  extractState (uri, uriType = HASH) {
+    if (!uri) { return null }
     let uriObj = new URL(uri)
     let state
-    if (uriType === 'hash') {
+    if (uriType === HASH) {
       let hash = uriObj.hash || '#'
       let params = new URLSearchParams(hash.substr(1))
       state = params.get('state')
     }
-    if (uriType === 'query') {
+    if (uriType === QUERY) {
       state = uriObj.searchParams.get('state')
     }
     return state
-  }
-
-  init (callbacks = {}) {
-    this.callbacks = callbacks
-    window.addEventListener('message', this.onMessage.bind(this))
-    this.detectAuthCallback()
   }
 
   keyByProvider (providerUri = this.providerUri) {
@@ -136,6 +91,9 @@ class ClientAuthOIDC {
   }
 
   keyByState (state) {
+    if (!state) {
+      throw new TypeError('No state provided to keyByState()')
+    }
     return `oidc.rp.by-state.${state}`
   }
 
@@ -144,28 +102,46 @@ class ClientAuthOIDC {
    * @return {Promise<RelyingParty>}
    */
   loadOrRegisterClient (providerUri) {
-    if (this.currentClient) {
-      console.log('currentClient cached, returning')
+    return this.loadClient(providerUri)
+      .then(loadedClient => {
+        if (loadedClient) {
+          return loadedClient
+        } else {
+          return this.registerClient(providerUri)
+        }
+      })
+  }
+
+  /**
+   * @param providerUri {string}
+   * @return {Promise<RelyingParty>}
+   */
+  loadClient (providerUri) {
+    if (!providerUri) {
+      let error = new Error('Cannot load or register client, providerURI missing')
+      return Promise.reject(error)
+    }
+    if (this.currentClient && this.currentClient.provider.url === providerUri) {
+      // Client is cached, return it
       return Promise.resolve(this.currentClient)
     }
+
     // Check for client config stored locally
     let key = this.keyByProvider(providerUri)
     let clientConfig = localStorage.getItem(key)
     if (clientConfig) {
-      console.log('client config stored locally for ', providerUri)
       clientConfig = JSON.parse(clientConfig)
       return RelyingParty.from(clientConfig)
     } else {
-      console.log('client config not stored, proceeding to register client')
-      // Client not stored. Register it and store it
-      return this.registerClient(providerUri)
-        .then(client => {
-          this.storeClient(client, providerUri)
-          return client
-        })
+      return Promise.resolve(null)
     }
   }
 
+  /**
+   * Loads a provider's URI from localStorage, given a `state` uri param.
+   * @param state {string}
+   * @return {string}
+   */
   loadProvider (state) {
     let key = this.keyByState(state)
     let providerUri = localStorage.getItem(key)
@@ -173,32 +149,174 @@ class ClientAuthOIDC {
   }
 
   /**
-   * @param providerUri {string}
-   * @param client {RelyingParty}
-   * @param method {string} 'redirect' or 'popup'
-   * @return {Promise} Creates auth request uri, stores state & nonce, and
-   *   dispatches the auth request according to `method`.
+   * Resolves to the WebID URI of the current user. Intended to be called
+   * on page load (in case the user is already authenticated), as well as
+   * triggered when the user initiates login explicitly (such as by pressing
+   * a Login button, etc).
+   * @param [providerUri] {string} Provider URI, result of a Provider Selection
+   *   operation (that the app developer has provided). If `null`, the
+   *   `selectProvider()` step will kick off its own UI for Provider Selection.
+   * @return {Promise<string>} Resolves to the logged in user's WebID URI
    */
-  login (providerUri, client, method = 'redirect') {
-    if (!client) {
-      throw new TypeError('Cannot login(), missing client')
+  login (providerUri) {
+    let selectProvider = this.selectProvider.bind(this)
+    let loadOrRegisterClient = this.loadOrRegisterClient.bind(this)
+    let validateOrSendAuthRequest = this.validateOrSendAuthRequest.bind(this)
+
+    return Promise.resolve(providerUri)
+      .then(selectProvider)
+      .then(loadOrRegisterClient)
+      .then(validateOrSendAuthRequest)
+  }
+
+  /**
+   * Resolves to the URI of an OIDC identity provider, from one of the following:
+   *
+   * 1. If a `providerUri` was passed in by the app developer (perhaps they
+   *   developed a custom 'Select Provider' UI), that value is returned.
+   * 2. The current `this.providerUri` cached on this auth client, if present
+   * 3. The `state` parameter of the current window URI (in case the user has
+   *   gone through the login workflow and this page is the redirect back).
+   * 3. Lastly, if none of the above worked, the clients opens its own
+   *   'Select Provider' UI popup window, and sets up an event listener (for
+   *   when a user makes a selection.
+   *
+   * @param [providerUri] {string} If the provider URI is already known to the
+   *   app developer, just pass it through, no need to take further action.
+   * @return {Promise<string>}
+   */
+  selectProvider (providerUri) {
+    if (providerUri) {
+      return Promise.resolve(providerUri)
     }
-    return client.createRequest({}, localStorage)
+    // Attempt to find a provider based on the 'state' param of the current URI
+    providerUri = this.providerFromCurrentUri()
+    if (providerUri) {
+      return Promise.resolve(providerUri)
+    }
+    // Lastly, kick off a Select Provider popup window workflow
+    return this.providerFromUI()
+  }
+
+  /**
+   * Parses the current URI's `state` hash param and attempts to load a
+   * previously saved providerUri from it. If no `state` param is present, or if
+   * no providerUri has been saved, returns `null`.
+   *
+   * @return {string|null} Provider URI, if present
+   */
+  providerFromCurrentUri () {
+    let currentUri = this.currentLocation()
+    let stateParam = this.extractState(currentUri, HASH)
+    if (stateParam) {
+      return this.loadProvider(stateParam)
+    } else {
+      return null
+    }
+  }
+
+  providerFromUI () {
+    console.log('No state param, getting provider from UI')
+    this.initEventListeners(window)
+    // Get the provider from the UI somehow
+  }
+
+  /**
+   * Tests whether the current URI is the result of an AuthenticationRequest
+   * return redirect.
+   * @return {boolean}
+   */
+  currentUriHasAuthResponse () {
+    let currentUri = this.currentLocation()
+    let stateParam = this.extractState(currentUri, HASH)
+    return !!stateParam
+  }
+
+  /**
+   * Redirects the current window to the given uri.
+   * @param uri {string}
+   */
+  redirectTo (uri) {
+    this.window.location = uri
+  }
+
+  /**
+   * @private
+   * @param client {RelyingParty}
+   * @throws {Error}
+   * @return {Promise<null>}
+   */
+  sendAuthRequest (client) {
+    let options = {}
+    let providerUri = client.provider.url
+    return client.createRequest(options, this.localStorage)
       .then(authUri => {
-        console.log('login()>createRequest()>url: ', authUri)
-        let state = this.extractState(authUri, 'query')
+        let state = this.extractState(authUri, QUERY)
         if (!state) {
-          throw new Error('login() - could not extract state param')
+          throw new Error('Invalid authentication request uri')
         }
-        this.saveProviderByState(providerUri, state)
-        if (method === 'redirect') {
-          window.location = authUri
+        this.saveProviderByState(state, providerUri)
+        if (this.method === REDIRECT) {
+          this.redirectTo(authUri)
         }
       })
   }
 
   /**
-   * @private
+   * @param client {RelyingParty}
+   * @throws {Error}
+   * @return {Promise<null|string>} Resolves to either an AuthenticationRequest
+   *   being sent (`null`), or to the webId of the current user (extracted
+   *   from the authentication response).
+   */
+  validateOrSendAuthRequest (client) {
+    if (!client) {
+      let error = new Error('Could not load or register a RelyingParty client')
+      return Promise.reject(error)
+    }
+
+    if (this.currentUriHasAuthResponse()) {
+      return this.initUserFromResponse(client)
+    }
+
+    return this.sendAuthRequest(client)
+  }
+
+  /**
+   * Validates the auth response in the current uri, initializes the current
+   * user's ID Token and Access token, and returns the
+   * @param client {RelyingParty}
+   * @throws {Error}
+   * @returns {Promise<string>}
+   */
+  initUserFromResponse (client) {
+    return client.validateResponse(this.currentLocation(), this.localStorage)
+      .then(response => {
+        this.idToken = response.params.id_token
+        this.accessToken = response.params.access_token
+        return this.extractAndValidateWebId(response.decoded)
+      })
+      .catch(error => {
+        if (error.message === 'Cannot resolve signing key for ID Token.') {
+          console.log('ID Token found, but could not validate. Provider likely has changed their public keys. Please retry login.')
+          return null
+        } else {
+          throw error
+        }
+      })
+  }
+
+  /**
+   * @param idToken {IDToken}
+   * @throws {Error}
+   * @return {string}
+   */
+  extractAndValidateWebId (idToken) {
+    let webId = idToken.payload.sub
+    return webId
+  }
+
+  /**
    * @param providerUri {string}
    * @param [options={}]
    * @param [options.redirectUri] {string} Defaults to window.location.href
@@ -209,8 +327,9 @@ class ClientAuthOIDC {
    */
   registerClient (providerUri, options = {}) {
     return this.registerPublicClient(providerUri, options)
-      .catch(error => {
-        console.error('Error while registering:', error)
+      .then(registeredClient => {
+        this.storeClient(registeredClient, providerUri)
+        return registeredClient
       })
   }
 
@@ -229,7 +348,7 @@ class ClientAuthOIDC {
     if (!providerUri) {
       throw new TypeError('Cannot registerClient auth client, missing providerUri')
     }
-    let redirectUri = options.redirectUri || window.location.href
+    let redirectUri = options.redirectUri || this.currentLocation()
     this.redirectUri = redirectUri
     let registration = {
       issuer: providerUri,
@@ -256,7 +375,7 @@ class ClientAuthOIDC {
     if (!event || !event.data) { return }
     switch (event.data.event_type) {
       case 'providerSelected':
-        this.selectProvider(event.data.value)
+        console.log('Provider selected: ', event.data.value)
         break
       default:
         console.error('onMessage - unknown event type: ', event)
@@ -264,23 +383,26 @@ class ClientAuthOIDC {
     }
   }
 
-  saveProviderByState (providerUri, state) {
+  /**
+   * @param state {string}
+   * @param providerUri {string}
+   * @throws {Error}
+   */
+  saveProviderByState (state, providerUri) {
+    if (!state) {
+      throw new Error('Cannot save providerUri - state not provided')
+    }
     let key = this.keyByState(state)
     localStorage.setItem(key, providerUri)
   }
 
-  selectProvider (providerUri, loginMethod = 'redirect') {
-    this.dispatchProviderSelected(providerUri)
-    this.loadOrRegisterClient(providerUri)
-      .then(client => {
-        console.log('Obtained registered client. Proceeding to login().')
-        return this.login(providerUri, client, loginMethod)
-      })
-  }
-
+  /**
+   * Stores a RelyingParty client for a given provider in localStorage.
+   * @param client {RelyingParty}
+   * @param providerUri {string}
+   */
   storeClient (client, providerUri) {
     this.currentClient = client
-    // this.clientId = currentClient.registration.client_id
     localStorage.setItem(this.keyByProvider(providerUri), client.serialize())
   }
 }

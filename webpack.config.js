@@ -7,7 +7,7 @@ module.exports = {
   output: {
     path: path.join(__dirname, '/dist/'),
     filename: 'solid-auth-oidc.min.js',
-    library: 'SolidAuth',
+    library: 'SolidAuthOIDC',
     libraryTarget: 'var'
   },
   externals: {
