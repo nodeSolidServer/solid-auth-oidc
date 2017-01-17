@@ -64,7 +64,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('message', onMessage)
     init()
-    SolidClient.auth.currentUser()
+    SolidClient.currentUser()
       .then(function (webId) {
         loginSuccess(webId)
       })
@@ -85,7 +85,7 @@
   }
 
   function loginTo (providerUri) {
-    SolidClient.auth.login(providerUri)
+    SolidClient.login(providerUri)
       .then(function (webId) {
         loginSuccess(webId)
       })
@@ -110,7 +110,15 @@
   }
 
   function logout () {
-    alert('logging out')
+    SolidClient.logout()
+      .then(function () {
+        console.log('logged out')
+        hide('logoutDiv')
+        setField('webId', SolidClient.auth.webId)
+      })
+      .catch(function (err) {
+        console.error('Error logging out: ', err)
+      })
   }
 
   function getRootAcl () {

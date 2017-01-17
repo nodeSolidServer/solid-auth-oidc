@@ -192,6 +192,14 @@ class ClientAuthOIDC {
     this.idToken = null
   }
 
+  logout () {
+    this.clearCurrentUser()
+    if (!this.currentClient) {
+      return Promise.resolve(null)
+    }
+    return this.currentClient.logout()
+  }
+
   /**
    * Resolves to the URI of an OIDC identity provider, from one of the following:
    *

@@ -35,3 +35,5 @@ node_modules
 # Build dirs
 lib
 dist
+demo/solid-client.min.js*
+
