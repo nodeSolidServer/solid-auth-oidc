@@ -337,6 +337,52 @@ describe('SolidAuthOIDC', () => {
           expect(auth.window.location).to.equal(authUri)
           done()
         })
+        .catch(err => { console.error(err.message) })
+    })
+  })
+
+  describe('currentUser()', () => {
+    it('should return cached webId if present', done => {
+      let aliceWebId = 'https://alice.example.com'
+      let auth = new SolidAuthOIDC()
+      auth.webId = aliceWebId
+
+      auth.currentUser()
+        .then(webId => {
+          expect(webId).to.equal(aliceWebId)
+          done()
+        })
+        .catch(err => { console.error(err.message) })
+    })
+
+    it('should return null if no cached webId and no current state param', done => {
+      let auth = new SolidAuthOIDC({ window: { location: {} } })
+      auth.currentUser()
+        .then(webId => {
+          expect(webId).to.not.exist
+          done()
+        })
+        .catch(err => { console.error(err.message) })
+    })
+
+    it('should automatically login if current uri has state param', done => {
+      let state = 'abcd'
+      let providerUri = 'https://provider.example.com'
+      let auth = new SolidAuthOIDC({ window: { location: {} } })
+      auth.saveProviderByState(state, providerUri)
+
+      auth.window.location.href = `https://client-app.example.com#state=${state}`
+      let aliceWebId = 'https://alice.example.com/'
+      let loginStub = sinon.stub().returns(Promise.resolve(aliceWebId))
+      auth.login = loginStub
+
+      auth.currentUser()
+        .then(webId => {
+          expect(webId).to.equal(aliceWebId)
+          expect(loginStub).to.have.been.calledWith(providerUri)
+          done()
+        })
+        .catch(err => { console.error(err.message) })
     })
   })
 })

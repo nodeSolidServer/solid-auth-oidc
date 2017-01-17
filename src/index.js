@@ -42,8 +42,8 @@ class ClientAuthOIDC {
    * @param [options.localStorage=localStorage] Optionally inject localStorage
    */
   constructor (options = {}) {
-    this.window = options.window || window
-    this.localStorage = options.localStorage || localStorage
+    this.window = options.window || global.window
+    this.localStorage = options.localStorage || global.localStorage
     this.currentClient = null
     this.providerUri = null
     this.webId = null
@@ -63,6 +63,19 @@ class ClientAuthOIDC {
   currentLocation () {
     let window = this.window
     return window.location.href
+  }
+
+  currentUser () {
+    if (this.webId) {
+      return Promise.resolve(this.webId)
+    }
+    // Attempt to find a provider based on the 'state' param of the current URI
+    let providerUri = this.providerFromCurrentUri()
+    if (providerUri) {
+      return this.login(providerUri)
+    } else {
+      return Promise.resolve(null)
+    }
   }
 
   /**
@@ -102,11 +115,14 @@ class ClientAuthOIDC {
    * @return {Promise<RelyingParty>}
    */
   loadOrRegisterClient (providerUri) {
+    this.currentClient = null
     return this.loadClient(providerUri)
       .then(loadedClient => {
         if (loadedClient) {
+          this.currentClient = loadedClient
           return loadedClient
         } else {
+          this.currentClient = null
           return this.registerClient(providerUri)
         }
       })
@@ -159,6 +175,7 @@ class ClientAuthOIDC {
    * @return {Promise<string>} Resolves to the logged in user's WebID URI
    */
   login (providerUri) {
+    this.clearCurrentUser()
     let selectProvider = this.selectProvider.bind(this)
     let loadOrRegisterClient = this.loadOrRegisterClient.bind(this)
     let validateOrSendAuthRequest = this.validateOrSendAuthRequest.bind(this)
@@ -167,6 +184,12 @@ class ClientAuthOIDC {
       .then(selectProvider)
       .then(loadOrRegisterClient)
       .then(validateOrSendAuthRequest)
+  }
+
+  clearCurrentUser () {
+    this.webId = null
+    this.accessToken = null
+    this.idToken = null
   }
 
   /**
@@ -313,6 +336,7 @@ class ClientAuthOIDC {
    */
   extractAndValidateWebId (idToken) {
     let webId = idToken.payload.sub
+    this.webId = webId
     return webId
   }
 

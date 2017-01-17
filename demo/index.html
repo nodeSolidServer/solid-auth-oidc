@@ -62,15 +62,37 @@
   //  (equivalent to jQuery's $(document).ready())
   // Trigger a login() check on page load, in case user is logged in already
   document.addEventListener('DOMContentLoaded', function () {
-    SolidClient.auth.login()
-      .then(function (webId, accessToken) {
-        loginSuccess(webId, accessToken)
+    window.addEventListener('message', onMessage)
+    init()
+    SolidClient.auth.currentUser()
+      .then(function (webId) {
+        loginSuccess(webId)
+      })
+  })
+
+  function onMessage (event) {
+    console.log('Auth client received event: ', event)
+    if (!event || !event.data) { return }
+    switch (event.data.event_type) {
+      case 'providerSelected':
+        console.log('Provider selected: ', event.data.value)
+        loginTo(event.data.value)
+        break
+      default:
+        console.error('onMessage - unknown event type: ', event)
+        break
+    }
+  }
+
+  function loginTo (providerUri) {
+    SolidClient.auth.login(providerUri)
+      .then(function (webId) {
+        loginSuccess(webId)
       })
       .catch(function (error) {
         console.error('Error logging in:', error)
       })
-    init()
-  })
+  }
 
   function init () {
     initButton('getRootAcl', getRootAcl)
