@@ -65,6 +65,9 @@ class ClientAuthOIDC {
     return window.location.href
   }
 
+  /**
+   * @return {Promise<string>} Resolves to current user's WebID URI
+   */
   currentUser () {
     if (this.webId) {
       return Promise.resolve(this.webId)
@@ -177,13 +180,19 @@ class ClientAuthOIDC {
   login (providerUri) {
     this.clearCurrentUser()
     let selectProvider = this.selectProvider.bind(this)
-    let loadOrRegisterClient = this.loadOrRegisterClient.bind(this)
-    let validateOrSendAuthRequest = this.validateOrSendAuthRequest.bind(this)
 
     return Promise.resolve(providerUri)
       .then(selectProvider)
-      .then(loadOrRegisterClient)
-      .then(validateOrSendAuthRequest)
+      .then(selectedProviderUri => {
+        if (selectedProviderUri) {
+          return this.loadOrRegisterClient(selectedProviderUri)
+        }
+      })
+      .then(client => {
+        if (client) {
+          return this.validateOrSendAuthRequest(client)
+        }
+      })
   }
 
   clearCurrentUser () {
@@ -247,9 +256,16 @@ class ClientAuthOIDC {
   }
 
   providerFromUI () {
-    console.log('No state param, getting provider from UI')
-    this.initEventListeners(window)
-    // Get the provider from the UI somehow
+    console.log('Getting provider from default popup UI')
+    this.initEventListeners(this.window)
+
+    if (!this.selectProviderWindow) {
+      this.selectProviderWindow = this.window.open('login_iframe_inline.html',
+        'selectProviderWindow', 'menubar=no,resizable=yes,width=300,height=300')
+    }
+    if (this.selectProviderWindow) {
+      this.selectProviderWindow.focus()
+    }
   }
 
   /**
@@ -268,7 +284,8 @@ class ClientAuthOIDC {
    * @param uri {string}
    */
   redirectTo (uri) {
-    this.window.location = uri
+    this.window.location.href = uri
+    return false
   }
 
   /**
@@ -288,7 +305,7 @@ class ClientAuthOIDC {
         }
         this.saveProviderByState(state, providerUri)
         if (this.method === REDIRECT) {
-          this.redirectTo(authUri)
+          return this.redirectTo(authUri)
         }
       })
   }
@@ -407,7 +424,10 @@ class ClientAuthOIDC {
     if (!event || !event.data) { return }
     switch (event.data.event_type) {
       case 'providerSelected':
-        console.log('Provider selected: ', event.data.value)
+        let providerUri = event.data.value
+        console.log('Provider selected: ', providerUri)
+        this.login(providerUri)
+        this.selectProviderWindow.close()
         break
       default:
         console.error('onMessage - unknown event type: ', event)

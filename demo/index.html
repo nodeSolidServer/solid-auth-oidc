@@ -17,9 +17,8 @@
     <h3>Solid Auth Demo Page</h3>
   </div>
   <div class="demo-section" style="width: 100%;">
-    <p>Login Option 1: Login on the same page (in iframe), allow main window
-      redirect.</p>
-    <iframe id="solidLogin" src="login_iframe_inline.html" seamless style="width: 100%; border: none; margin-top: 1em;"></iframe>
+    <p>Login, invoked by itself, will open a default Provider Select popup window.</p>
+    <button type="button" id="login" class="btn btn-primary btn-md">Login</button>
   </div>
   <div class="demo-section">
     <h5>App body</h5>
@@ -60,9 +59,8 @@
 
   // Using a standard "document loaded" event listener
   //  (equivalent to jQuery's $(document).ready())
-  // Trigger a login() check on page load, in case user is logged in already
+  // Trigger a currentUser() check on page load, in case user is logged in already
   document.addEventListener('DOMContentLoaded', function () {
-    window.addEventListener('message', onMessage)
     init()
     SolidClient.currentUser()
       .then(function (webId) {
@@ -97,15 +95,24 @@
   function init () {
     initButton('getRootAcl', getRootAcl)
     initButton('logoutBtn', logout)
+    initButton('login', login)
   }
+
   function initButton(id, action) {
     document.getElementById(id).addEventListener('click', action)
   }
+
+  function login () {
+    SolidClient.login()
+  }
+
   function loginSuccess (webId) {
     console.log('onLoginSuccess() callback! webId: ', webId)
     hide('noWebId')
     show('logoutDiv')
-    setField('webId', webId)
+    if (webId) {
+      setField('webId', webId)
+    }
     show('getRootAclDiv')
   }
 

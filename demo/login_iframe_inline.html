@@ -4,72 +4,59 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-type" content="text/html;charset=utf-8">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
-  <script type="text/javascript">
-    var parent, pageUrl
-    window.addEventListener('load', function () { init() });
 
-    function init () {
-      parent = window.parent
-//      console.log('Frame parent: ', parent)
-      pageUrl = parent.window.location.href
-//      console.log('Parent url: ', pageUrl)
-//      console.log('Parent origin: ', parent.window.location.origin)
-//      console.log('iFrame origin: ', window.location.origin)
-//      var pageOrigin = opener.location.origin;
-//      opener.postMessage(pageUrl, pageOrigin);
-      initEvents()
-    }
-    function initButton(id, action) {
-      document.getElementById(id).addEventListener('click', action)
-    }
-    function initEvents () {
-      initButton('local_provider',
-        function () { selectProvider('https://ldnode.local:8443') })
-      initButton('db_provider',
-        function () { selectProvider('https://databox2.com') })
-    }
-    function selectProvider (providerUri) {
-      console.log('Provider selected: ', providerUri)
-      var message = {
-        event_type: 'providerSelected',
-        value: providerUri
-      }
-      parent.postMessage(message, parent.window.location.origin)
-    }
-    function setField (id, value) {
-      var field = document.getElementById(id)
-      if (field) {
-        field.innerHTML = value
-      }
-    }
-    function hide (id) {
-      document.getElementById(id).className = 'hidden'
-    }
-    function show (id) {
-      var div = document.getElementById(id)
-      div.className = div.className.replace('hidden', '')
-    }
-  </script>
 </head>
 <body>
 <div class="container">
   <div class="row">
-    <div class="col-sm-2"><strong>Provider:</strong></div>
-    <div class="col-sm-2">
-      <button type="button" class="btn btn-xs btn-primary" id="db_provider">
+    <div class="col-xs-12 text-center" style="margin-top: 3em;">
+      Login with:
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-12 text-center" style="padding-top: 2em;">
+      <button type="button" class="btn btn-md btn-primary" id="dbProvider">
         databox2.com
       </button>
     </div>
-    <div class="col-sm-2">
-      <button type="button" class="btn btn-xs btn-default" id="local_provider">
-        localhost
-      </button>
-    </div>
-    <div class="col-sm-6">
-      or custom:
-      <input type="text" id="custom_provider" value="" placeholder="databox.me" />
+  </div>
+  <div class="row">
+    <div class="col-xs-12 text-center" style="padding-top: 2em;">
+      or custom:<br />
+      <input type="text" id="customProviderUri" value="https://" placeholder="databox.me" />
+      <button type="button" class="btn btn-md" id="customProvider">Go</button>
     </div>
   </div>
 </div>
+<script type="text/javascript">
+  window.addEventListener('load', function () { init() });
+
+  function init () {
+    initEvents()
+  }
+  function initButton(id, action) {
+    document.getElementById(id).addEventListener('click', action)
+  }
+  function initEvents () {
+    initButton('dbProvider',
+      function () { selectProvider('https://databox2.com') })
+    initButton('customProvider',
+      function () {
+        var defaultValue = 'https://'
+        var customUri = document.getElementById('customProviderUri')
+        if (customUri && customUri.value !== defaultValue) {
+          selectProvider(customUri.value)
+        }
+      })
+  }
+  function selectProvider (providerUri) {
+    console.log('Provider selected: ', providerUri)
+    var message = {
+      event_type: 'providerSelected',
+      value: providerUri
+    }
+    opener.postMessage(message, opener.window.location.origin)
+  }
+</script>
 </body>
 </html>

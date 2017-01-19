@@ -334,7 +334,7 @@ describe('SolidAuthOIDC', () => {
           // ensure providerUri was saved
           expect(auth.loadProvider(state)).to.equal(providerUri)
           // ensure the redirect happened
-          expect(auth.window.location).to.equal(authUri)
+          expect(auth.currentLocation()).to.equal(authUri)
           done()
         })
         .catch(err => { console.error(err.message) })

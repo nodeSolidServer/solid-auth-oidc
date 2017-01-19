@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "npm run build-lib",
-    "build-dist": "webpack --progress --colors --optimize-occurrence-order --optimize-dedupe",
+    "build-dist": "webpack --progress --colors --optimize-occurrence-order --optimize-dedupe --optimize-minimize",
     "build-lib": "babel src -d lib",
     "dist": "npm run build && npm run build-dist",
     "karma": "./node_modules/.bin/karma start",
