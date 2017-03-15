@@ -26,6 +26,7 @@
  */
 'use strict'
 const RelyingParty = require('oidc-rp')
+const providerSelectPopupSource = require('./provider-select-popup')
 
 // URI parameter types
 const HASH = 'hash'
@@ -172,9 +173,11 @@ class ClientAuthOIDC {
    * on page load (in case the user is already authenticated), as well as
    * triggered when the user initiates login explicitly (such as by pressing
    * a Login button, etc).
+   *
    * @param [providerUri] {string} Provider URI, result of a Provider Selection
    *   operation (that the app developer has provided). If `null`, the
    *   `selectProvider()` step will kick off its own UI for Provider Selection.
+   *
    * @return {Promise<string>} Resolves to the logged in user's WebID URI
    */
   login (providerUri) {
@@ -259,12 +262,18 @@ class ClientAuthOIDC {
     console.log('Getting provider from default popup UI')
     this.initEventListeners(this.window)
 
-    if (!this.selectProviderWindow) {
-      this.selectProviderWindow = this.window.open('login_iframe_inline.html',
-        'selectProviderWindow', 'menubar=no,resizable=yes,width=300,height=300')
-    }
     if (this.selectProviderWindow) {
+      // Popup has already been opened
       this.selectProviderWindow.focus()
+    } else {
+      // Open a new Provider Select popup window
+      this.selectProviderWindow = this.window.open('',
+        'selectProviderWindow',
+        'menubar=no,resizable=yes,width=300,height=300'
+      )
+
+      this.selectProviderWindow.document.write(providerSelectPopupSource)
+      this.selectProviderWindow.document.close()
     }
   }
 

@@ -85,7 +85,7 @@
   function loginTo (providerUri) {
     SolidClient.login(providerUri)
       .then(function (webId) {
-        loginSuccess(webId)
+        if (webId) { loginSuccess(webId) }
       })
       .catch(function (error) {
         console.error('Error logging in:', error)
