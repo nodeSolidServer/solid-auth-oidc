@@ -45,6 +45,7 @@ class ClientAuthOIDC {
   constructor (options = {}) {
     this.window = options.window || global.window
     this.localStorage = options.localStorage || global.localStorage
+
     this.currentClient = null
     this.providerUri = null
     this.webId = null
@@ -73,8 +74,10 @@ class ClientAuthOIDC {
     if (this.webId) {
       return Promise.resolve(this.webId)
     }
+
     // Attempt to find a provider based on the 'state' param of the current URI
     let providerUri = this.providerFromCurrentUri()
+
     if (providerUri) {
       return this.login(providerUri)
     } else {
@@ -92,18 +95,21 @@ class ClientAuthOIDC {
     if (!uri) { return null }
     let uriObj = new URL(uri)
     let state
+
     if (uriType === HASH) {
       let hash = uriObj.hash || '#'
       let params = new URLSearchParams(hash.substr(1))
       state = params.get('state')
     }
+
     if (uriType === QUERY) {
       state = uriObj.searchParams.get('state')
     }
+
     return state
   }
 
-  keyByProvider (providerUri = this.providerUri) {
+  keyByProvider (providerUri) {
     return `oidc.rp.by-provider.${providerUri}`
   }
 
@@ -120,6 +126,7 @@ class ClientAuthOIDC {
    */
   loadOrRegisterClient (providerUri) {
     this.currentClient = null
+
     return this.loadClient(providerUri)
       .then(loadedClient => {
         if (loadedClient) {
@@ -149,6 +156,7 @@ class ClientAuthOIDC {
     // Check for client config stored locally
     let key = this.keyByProvider(providerUri)
     let clientConfig = localStorage.getItem(key)
+
     if (clientConfig) {
       clientConfig = JSON.parse(clientConfig)
       return RelyingParty.from(clientConfig)
@@ -169,10 +177,9 @@ class ClientAuthOIDC {
   }
 
   /**
-   * Resolves to the WebID URI of the current user. Intended to be called
-   * on page load (in case the user is already authenticated), as well as
-   * triggered when the user initiates login explicitly (such as by pressing
-   * a Login button, etc).
+   * Resolves to the WebID URI of the current user. Intended to be triggered
+   * when the user initiates login explicitly (such as by pressing a Login
+   * button, etc).
    *
    * @param [providerUri] {string} Provider URI, result of a Provider Selection
    *   operation (that the app developer has provided). If `null`, the
@@ -182,10 +189,9 @@ class ClientAuthOIDC {
    */
   login (providerUri) {
     this.clearCurrentUser()
-    let selectProvider = this.selectProvider.bind(this)
 
     return Promise.resolve(providerUri)
-      .then(selectProvider)
+      .then(providerUri => this.selectProvider(providerUri))
       .then(selectedProviderUri => {
         if (selectedProviderUri) {
           return this.loadOrRegisterClient(selectedProviderUri)
@@ -206,9 +212,9 @@ class ClientAuthOIDC {
 
   logout () {
     this.clearCurrentUser()
-    if (!this.currentClient) {
-      return Promise.resolve(null)
-    }
+
+    if (!this.currentClient) { return Promise.resolve(null) }
+
     return this.currentClient.logout()
   }
 
@@ -232,11 +238,13 @@ class ClientAuthOIDC {
     if (providerUri) {
       return Promise.resolve(providerUri)
     }
+
     // Attempt to find a provider based on the 'state' param of the current URI
     providerUri = this.providerFromCurrentUri()
     if (providerUri) {
       return Promise.resolve(providerUri)
     }
+
     // Lastly, kick off a Select Provider popup window workflow
     return this.providerFromUI()
   }
@@ -251,6 +259,7 @@ class ClientAuthOIDC {
   providerFromCurrentUri () {
     let currentUri = this.currentLocation()
     let stateParam = this.extractState(currentUri, HASH)
+
     if (stateParam) {
       return this.loadProvider(stateParam)
     } else {
@@ -285,6 +294,7 @@ class ClientAuthOIDC {
   currentUriHasAuthResponse () {
     let currentUri = this.currentLocation()
     let stateParam = this.extractState(currentUri, HASH)
+
     return !!stateParam
   }
 
@@ -294,6 +304,7 @@ class ClientAuthOIDC {
    */
   redirectTo (uri) {
     this.window.location.href = uri
+
     return false
   }
 
@@ -306,6 +317,7 @@ class ClientAuthOIDC {
   sendAuthRequest (client) {
     let options = {}
     let providerUri = client.provider.url
+
     return client.createRequest(options, this.localStorage)
       .then(authUri => {
         let state = this.extractState(authUri, QUERY)
