@@ -17,15 +17,15 @@ module.exports = `<!doctype html>
   </div>
   <div class="row">
     <div class="col-xs-12 text-center" style="padding-top: 2em;">
-      <button type="button" class="btn btn-md btn-primary" id="dbProvider">
-        databox2.com
+      <button type="button" class="btn btn-md btn-primary" id="testProvider">
+        solidtest.space
       </button>
     </div>
   </div>
   <div class="row">
     <div class="col-xs-12 text-center" style="padding-top: 2em;">
       or custom:<br />
-      <input type="text" id="customProviderUri" value="https://" placeholder="databox.me" />
+      <input type="text" id="customProviderUri" value="https://" />
       <button type="button" class="btn btn-md" id="customProvider">Go</button>
     </div>
   </div>
@@ -42,8 +42,8 @@ module.exports = `<!doctype html>
   }
 
   function initEvents () {
-    initButton('dbProvider',
-      function () { selectProvider('https://databox2.com') })
+    initButton('testProvider',
+      function () { selectProvider('https://solidtest.space') })
     initButton('customProvider',
       function () {
         var defaultValue = 'https://'

@@ -9,7 +9,8 @@
   <!-- Solid Demo template/stylesheet -->
   <link rel="stylesheet" href="./demo.css" />
   <!-- Relying Party lib, exports a global var: SolidAuth -->
-  <script src="./solid-client.min.js"></script>
+  <!--<script src="./solid-client.min.js"></script>-->
+  <script src="https://solid.github.io/releases/solid.js/solid-client-0.24.0-oidc.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -33,10 +34,6 @@
             <button type="button" id="logoutBtn" class="btn btn-primary btn-xs">Log out</button>
           </div>
         </div>
-      </div>
-      <div class="row">
-        <div class="col-md-1 text-right"><strong>provider</strong></div>
-        <div class="col-md-11"><code id="providerUri"></code></div>
       </div>
       <br /><br />
       <div class="row" id="getRootAclDiv" class="hidden">
@@ -64,28 +61,15 @@
     init()
     SolidClient.currentUser()
       .then(function (webId) {
-        loginSuccess(webId)
+        if (webId) { loginSuccess(webId) }
       })
   })
 
-  function onMessage (event) {
-    console.log('Auth client received event: ', event)
-    if (!event || !event.data) { return }
-    switch (event.data.event_type) {
-      case 'providerSelected':
-        console.log('Provider selected: ', event.data.value)
-        loginTo(event.data.value)
-        break
-      default:
-        console.error('onMessage - unknown event type: ', event)
-        break
-    }
-  }
-
-  function loginTo (providerUri) {
-    SolidClient.login(providerUri)
+  // This is bound to the Login button
+  function login () {
+    SolidClient.login()
       .then(function (webId) {
-        if (webId) { loginSuccess(webId) }
+        loginSuccess(webId)
       })
       .catch(function (error) {
         console.error('Error logging in:', error)
@@ -100,10 +84,6 @@
 
   function initButton(id, action) {
     document.getElementById(id).addEventListener('click', action)
-  }
-
-  function login () {
-    SolidClient.login()
   }
 
   function loginSuccess (webId) {
@@ -149,14 +129,6 @@
     uri.pathname = '/.acl'
     uri.hash = ''
     return uri.href
-  }
-
-  function providerSelected (providerUri) {
-    setField('webId', '')
-    hide('logoutDiv')
-    hide('getRootAclDiv')
-    show('noWebId')
-    setField('providerUri', providerUri)
   }
 
   function setField (id, value) {
