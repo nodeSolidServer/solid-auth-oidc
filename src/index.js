@@ -60,10 +60,14 @@ class ClientAuthOIDC {
 
   /**
    * Returns the current window's URI
-   * @return {string}
+   *
+   * @return {string|null}
    */
   currentLocation () {
     let window = this.window
+
+    if (!window || !window.location) { return null }
+
     return window.location.href
   }
 
@@ -86,9 +90,29 @@ class ClientAuthOIDC {
   }
 
   /**
+   * Returns the 'end session' api endpoint of the current RP client's provider
+   * (e.g. 'https://example.com/logout'), if one is available.
+   *
+   * @return {string|null}
+   */
+  providerEndSessionEndpoint () {
+    let rp = this.currentClient
+
+    if (!rp || !rp.provider || !rp.provider.configuration) { return null }
+
+    let config = rp.provider.configuration
+
+    if (!config.end_session_endpoint) { return null }
+
+    return config.end_session_endpoint
+  }
+
+  /**
    * Extracts and returns the `state` query or hash fragment param from a uri
+   *
    * @param uri {string}
-   * @param uriType {string} 'hash' or QUERY
+   * @param uriType {string} 'hash' or 'query'
+   *
    * @return {string|null} Value of the `state` query or hash fragment param
    */
   extractState (uri, uriType = HASH) {
@@ -122,6 +146,7 @@ class ClientAuthOIDC {
 
   /**
    * @param providerUri {string}
+   *
    * @return {Promise<RelyingParty>}
    */
   loadOrRegisterClient (providerUri) {
@@ -210,12 +235,24 @@ class ClientAuthOIDC {
     this.idToken = null
   }
 
+  /**
+   * Clears the current user and tokens, and does a url redirect to the
+   * current RP client's provider's 'end session' endpoint.
+   * A redirect is done (instead of an ajax 'get') to enable the provider to
+   * clear any http-only session cookies.
+   */
   logout () {
     this.clearCurrentUser()
 
-    if (!this.currentClient) { return Promise.resolve(null) }
+    let logoutEndpoint = this.providerEndSessionEndpoint()
 
-    return this.currentClient.logout()
+    if (!logoutEndpoint) { return }
+
+    let logoutUrl = new URL(logoutEndpoint)
+
+    logoutUrl.searchParams.set('returnToUrl', this.currentLocation())
+
+    this.redirectTo(logoutUrl.toString())
   }
 
   /**
@@ -353,19 +390,26 @@ class ClientAuthOIDC {
 
   /**
    * Validates the auth response in the current uri, initializes the current
-   * user's ID Token and Access token, and returns the
+   * user's ID Token and Access token, and returns the user's WebID
+   *
    * @param client {RelyingParty}
+   *
    * @throws {Error}
-   * @returns {Promise<string>}
+   *
+   * @returns {Promise<string>} Current user's web id
    */
   initUserFromResponse (client) {
     return client.validateResponse(this.currentLocation(), this.localStorage)
       .then(response => {
         this.idToken = response.params.id_token
         this.accessToken = response.params.access_token
+
+        this.clearAuthResponseFromUrl()
+
         return this.extractAndValidateWebId(response.decoded)
       })
       .catch(error => {
+        this.clearAuthResponseFromUrl()
         if (error.message === 'Cannot resolve signing key for ID Token.') {
           console.log('ID Token found, but could not validate. Provider likely has changed their public keys. Please retry login.')
           return null
@@ -377,13 +421,44 @@ class ClientAuthOIDC {
 
   /**
    * @param idToken {IDToken}
+   *
    * @throws {Error}
+   *
    * @return {string}
    */
   extractAndValidateWebId (idToken) {
     let webId = idToken.payload.sub
     this.webId = webId
     return webId
+  }
+
+  /**
+   * Removes authentication response data (access token, id token etc) from
+   * the current url's hash fragment.
+   */
+  clearAuthResponseFromUrl () {
+    let clearedUrl = this.currentLocationNoHash()
+
+    this.replaceCurrentUrl(clearedUrl)
+  }
+
+  currentLocationNoHash () {
+    let currentLocation = this.currentLocation()
+    if (!currentLocation) { return null }
+
+    let currentUrl = new URL(this.currentLocation())
+    currentUrl.hash = ''  // remove the hash fragment
+    let clearedUrl = currentUrl.toString()
+
+    return clearedUrl
+  }
+
+  replaceCurrentUrl (newUrl) {
+    let history = this.window.history
+
+    if (!history) { return }
+
+    history.replaceState(history.state, history.title, newUrl)
   }
 
   /**

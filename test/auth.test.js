@@ -8,9 +8,9 @@ const chai = require('chai')
 const sinon = require('sinon')
 const sinonChai = require('sinon-chai')
 const chaiAsPromised = require('chai-as-promised')
-
 chai.use(sinonChai)
 chai.use(chaiAsPromised)
+chai.use(require('dirty-chai'))
 chai.should()
 
 const expect = chai.expect
@@ -35,7 +35,7 @@ describe('SolidAuthOIDC', () => {
 
       return auth.login()
         .then(() => {
-          expect(selectProvider).to.have.been.called
+          expect(selectProvider).to.have.been.called()
         })
     })
 
@@ -83,25 +83,33 @@ describe('SolidAuthOIDC', () => {
     it('should clear the current user', () => {
       let clearCurrentUser = sinon.spy(auth, 'clearCurrentUser')
 
-      return auth.logout()
-        .then(() => {
-          expect(clearCurrentUser).to.have.been.called
-        })
+      auth.logout()
+      expect(clearCurrentUser).to.have.been.called()
     })
 
-    it('should resolve with null if no current client exists', () => {
-      expect(auth.logout()).to.eventually.equal(null)
+    it('should not redirect if no current client exists', () => {
+      let redirectTo = sinon.spy(auth, 'redirectTo')
+
+      auth.logout()
+      expect(redirectTo).to.not.have.been.called()
     })
 
-    it('should invoke logout() on the current client', () => {
-      auth.currentClient = {
-        logout: sinon.stub().resolves(null)
-      }
+    it('should redirect to the provider end session endpoint', () => {
+      auth.window = { location: {} }
 
-      return auth.logout()
-        .then(() => {
-          expect(auth.currentClient.logout).to.have.been.called
-        })
+      let logoutEndpoint = 'https://example.com/logout'
+      auth.providerEndSessionEndpoint = sinon.stub().returns(logoutEndpoint)
+
+      let currentUrl = 'https://rp.com'
+      auth.currentLocation = sinon.stub().returns(currentUrl)
+
+      let redirectTo = sinon.spy(auth, 'redirectTo')
+
+      auth.logout()
+
+      expect(redirectTo)
+        .to.have.been.calledWith('https://example.com/logout?returnToUrl=' +
+          encodeURIComponent(currentUrl))
     })
   })
 
@@ -130,7 +138,7 @@ describe('SolidAuthOIDC', () => {
       auth.window.location.href = 'https://client-app.example.com'
       let providerUri = auth.providerFromCurrentUri()
 
-      expect(providerUri).to.not.exist
+      expect(providerUri).to.not.exist()
     })
 
     it('should return null if no provider was saved', () => {
@@ -138,7 +146,7 @@ describe('SolidAuthOIDC', () => {
       auth.window.location.href = `https://client-app.example.com#state=${state}`
       let loadedProviderUri = auth.providerFromCurrentUri()
 
-      expect(loadedProviderUri).to.not.exist
+      expect(loadedProviderUri).to.not.exist()
     })
 
     it('should load provider from current uri state param', () => {
@@ -159,7 +167,7 @@ describe('SolidAuthOIDC', () => {
       let providerUri = 'https://provider.example.com'
       let state = 'abcd'
       // Check to see that provider doesn't exist initially
-      expect(auth.loadProvider(state)).to.not.exist
+      expect(auth.loadProvider(state)).to.not.exist()
 
       // Save the provider uri to local storage
       auth.saveProviderByState(state, providerUri)
@@ -179,13 +187,13 @@ describe('SolidAuthOIDC', () => {
     it('should return null when no uri is provided', () => {
       let state = auth.extractState()
 
-      expect(state).to.not.exist
+      expect(state).to.not.exist()
     })
 
     it('should return null when uri has no query or hash fragment', () => {
       let state = auth.extractState('https://example.com')
 
-      expect(state).to.not.exist
+      expect(state).to.not.exist()
     })
 
     it('should extract the state param from query fragments', () => {
@@ -197,7 +205,7 @@ describe('SolidAuthOIDC', () => {
       uri = 'https://example.com?param1=value1'
       state = auth.extractState(uri, 'query')
 
-      expect(state).to.not.exist
+      expect(state).to.not.exist()
     })
 
     it('should extract the state param from hash fragments', () => {
@@ -209,7 +217,7 @@ describe('SolidAuthOIDC', () => {
       uri = 'https://example.com#param1=value1'
       state = auth.extractState(uri, 'hash')
 
-      expect(state).to.not.exist
+      expect(state).to.not.exist()
     })
   })
 
@@ -229,7 +237,7 @@ describe('SolidAuthOIDC', () => {
       return auth.selectProvider()
         .then(selectedProvider => {
           expect(selectedProvider).to.equal(providerUri)
-          expect(auth.providerFromCurrentUri).to.have.been.called
+          expect(auth.providerFromCurrentUri).to.have.been.called()
         })
     })
 
@@ -242,7 +250,7 @@ describe('SolidAuthOIDC', () => {
       return auth.selectProvider()
         .then(selectedProvider => {
           expect(selectedProvider).to.equal(providerUri)
-          expect(auth.providerFromUI).to.have.been.called
+          expect(auth.providerFromUI).to.have.been.called()
         })
     })
   })
@@ -262,7 +270,7 @@ describe('SolidAuthOIDC', () => {
 
     describe('loadClient()', () => {
       it('should throw an error if no providerUri given', () => {
-        expect(auth.loadClient()).to.be.rejected
+        expect(auth.loadClient()).to.be.rejected()
       })
 
       it('should return cached client if for the same provider', () => {
@@ -277,7 +285,7 @@ describe('SolidAuthOIDC', () => {
           provider: { url: 'https://another.provider.com' }
         }
 
-        expect(auth.loadClient(providerUri)).to.eventually.not.exist
+        expect(auth.loadClient(providerUri)).to.eventually.not.exist()
       })
     })
 
@@ -371,7 +379,7 @@ describe('SolidAuthOIDC', () => {
       return auth.initUserFromResponse(mockClient)
         .then(webId => {
           expect(webId).to.equal(aliceWebId)
-          expect(validateResponseStub).to.have.been.called
+          expect(validateResponseStub).to.have.been.called()
         })
     })
   })
@@ -410,7 +418,7 @@ describe('SolidAuthOIDC', () => {
     it('should return null if no cached webId and no current state param', () => {
       let auth = new SolidAuthOIDC({ window: { location: {} } })
 
-      expect(auth.currentUser()).to.eventually.not.exist
+      expect(auth.currentUser()).to.eventually.not.exist()
     })
 
     it('should automatically login if current uri has state param', () => {
@@ -429,6 +437,120 @@ describe('SolidAuthOIDC', () => {
           expect(webId).to.equal(aliceWebId)
           expect(loginStub).to.have.been.calledWith(providerUri)
         })
+    })
+  })
+
+  describe('providerEndSessionEndpoint()', () => {
+    let auth
+
+    beforeEach(() => {
+      auth = new SolidAuthOIDC()
+    })
+
+    it('should return null if no current client', () => {
+      auth.currentClient = null
+
+      let url = auth.providerEndSessionEndpoint()
+
+      expect(url).to.equal(null)
+    })
+
+    it('should return null if current client has no provider', () => {
+      auth.currentClient = {}
+
+      let url = auth.providerEndSessionEndpoint()
+
+      expect(url).to.equal(null)
+    })
+
+    it('should return null if current provider has no configuration', () => {
+      auth.currentClient = { provider: {} }
+
+      let url = auth.providerEndSessionEndpoint()
+
+      expect(url).to.equal(null)
+    })
+
+    it('should return null if current configuration has no end session endpoint', () => {
+      auth.currentClient = { provider: { configuration: {} } }
+
+      let url = auth.providerEndSessionEndpoint()
+
+      expect(url).to.equal(null)
+    })
+
+    it('should return null if current provider end session endpoint', () => {
+      auth.currentClient = {
+        provider: {
+          configuration: {
+            'end_session_endpoint': 'https://example.com/logout'
+          }
+        }
+      }
+
+      let url = auth.providerEndSessionEndpoint()
+
+      expect(url).to.equal('https://example.com/logout')
+    })
+  })
+
+  describe('clearAuthResponseFromUrl()', () => {
+    it('should replace the current url with a no-hash cleared one', () => {
+      let auth = new SolidAuthOIDC()
+
+      let clearedUrl = 'https://rp.com'
+
+      auth.currentLocationNoHash = sinon.stub().returns(clearedUrl)
+      auth.replaceCurrentUrl = sinon.stub()
+
+      auth.clearAuthResponseFromUrl()
+
+      expect(auth.replaceCurrentUrl).to.have.been.calledWith(clearedUrl)
+    })
+  })
+
+  describe('replaceCurrentUrl()', () => {
+    it('should do nothing if no window history present', () => {
+      let auth = new SolidAuthOIDC()
+      auth.window = {}
+
+      expect(() => { auth.replaceCurrentUrl() }).to.not.throw()
+    })
+
+    it('should invoke replaceState() on window history with new url', () => {
+      let auth = new SolidAuthOIDC()
+      auth.window = {
+        history: {
+          replaceState: sinon.stub()
+        }
+      }
+
+      let clearedUrl = 'https://example.com'
+      auth.currentLocationNoHash = sinon.stub().returns(clearedUrl)
+
+      auth.replaceCurrentUrl()
+    })
+  })
+
+  describe('currentLocationNoHash()', () => {
+    it('should return null if no current location', () => {
+      let auth = new SolidAuthOIDC()
+
+      let url = auth.currentLocationNoHash()
+
+      expect(url).to.equal(null)
+    })
+
+    it('should return the current location with cleared hash fragment', () => {
+      let auth = new SolidAuthOIDC()
+
+      let currentUrl = 'https://example.com/#whatever'
+
+      auth.currentLocation = sinon.stub().returns(currentUrl)
+
+      let url = auth.currentLocationNoHash()
+
+      expect(url).to.equal('https://example.com/')
     })
   })
 })

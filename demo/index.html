@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="./demo.css" />
   <!-- Relying Party lib, exports a global var: SolidAuth -->
   <!--<script src="./solid-client.min.js"></script>-->
-  <script src="https://solid.github.io/releases/solid.js/solid-client-0.24.0-oidc.min.js"></script>
+  <script src="https://solid.github.io/releases/solid.js/solid-client.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -59,7 +59,7 @@
   // Trigger a currentUser() check on page load, in case user is logged in already
   document.addEventListener('DOMContentLoaded', function () {
     init()
-    SolidClient.currentUser()
+    SolidClient.auth.currentUser()
       .then(function (webId) {
         if (webId) { loginSuccess(webId) }
       })
@@ -67,7 +67,7 @@
 
   // This is bound to the Login button
   function login () {
-    SolidClient.login()
+    SolidClient.auth.login()
       .then(function (webId) {
         loginSuccess(webId)
       })
@@ -97,15 +97,8 @@
   }
 
   function logout () {
-    SolidClient.logout()
-      .then(function () {
-        console.log('logged out')
-        hide('logoutDiv')
-        setField('webId', SolidClient.auth.webId)
-      })
-      .catch(function (err) {
-        console.error('Error logging out: ', err)
-      })
+    console.log('Logging out...')
+    SolidClient.auth.logout()
   }
 
   function getRootAcl () {

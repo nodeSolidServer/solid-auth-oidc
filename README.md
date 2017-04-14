@@ -93,3 +93,8 @@ After `login()` is successful, the following variables are set:
 
 ##### logout
 
+`logout()`
+
+Clears the current user and tokens, and does a url redirect to the current
+RP client's provider's 'end session' endpoint. A redirect is done (instead of an
+ajax 'get') to enable the provider to clear any http-only session cookies.
