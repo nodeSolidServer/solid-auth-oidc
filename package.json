@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "npm run build-lib",
-    "build-dist": "webpack --progress --colors --optimize-occurrence-order --optimize-dedupe --optimize-minimize",
+    "build-dist": "webpack --progress --colors --optimize-minimize",
     "build-lib": "babel src -d lib",
     "dist": "npm run build && npm run build-dist",
     "mocha": "nyc mocha test/*.js",
@@ -56,23 +56,23 @@
   },
   "homepage": "https://github.com/solid/solid-auth-oidc",
   "dependencies": {
-    "oidc-rp": "git://github.com/anvilresearch/oidc-rp.git#rc-004"
+    "@trust/oidc-rp": "^0.2.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.18.0",
-    "babel-core": "^6.21.0",
-    "babel-loader": "^6.2.5",
-    "babel-preset-es2015": "^6.18.0",
+    "babel-cli": "^6.24.1",
+    "babel-core": "^6.24.1",
+    "babel-loader": "^7.0.0",
+    "babel-preset-es2015": "^6.24.1",
     "chai": "^3.5.0",
     "chai-as-promised": "^6.0.0",
     "dirty-chai": "^1.2.2",
     "localstorage-polyfill": "^1.0.1",
-    "mocha": "^3.2.0",
+    "mocha": "^3.3.0",
     "nyc": "^10.2.0",
     "sinon": "^2.1.0",
     "sinon-chai": "^2.9.0",
-    "standard": "^9.0.2",
-    "webpack": "^1.14.0"
+    "standard": "^10.0.2",
+    "webpack": "^2.5.1"
   },
   "standard": {
     "globals": [

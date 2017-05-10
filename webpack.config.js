@@ -10,11 +10,22 @@ module.exports = {
     library: 'SolidAuthOIDC',
     libraryTarget: 'var'
   },
+  module: {
+    loaders: [
+      {
+        test: /\.js$/,
+        loader: 'babel-loader',
+        query: {
+          presets: ['es2015']
+        }
+      }
+    ]
+  },
   externals: {
     'node-fetch': 'fetch',
     'text-encoding': 'TextEncoder',
     'urlutils': 'URL',
-    'webcrypto': 'crypto'
+    '@trust/webcrypto': 'crypto'
   },
   devtool: 'source-map'
 }

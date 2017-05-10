@@ -25,7 +25,7 @@
  https://github.com/solid/solid
  */
 'use strict'
-const RelyingParty = require('oidc-rp')
+const RelyingParty = require('@trust/oidc-rp')
 const providerSelectPopupSource = require('./provider-select-popup')
 
 // URI parameter types
