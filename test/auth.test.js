@@ -1,8 +1,9 @@
 'use strict'
 
-require('localstorage-polyfill')  // exports 'localStorage' global
 global.URL = require('url').URL
 global.URLSearchParams = require('url').URLSearchParams
+
+const localStorage = require('localstorage-memory')
 
 const chai = require('chai')
 const sinon = require('sinon')
@@ -26,7 +27,7 @@ describe('SolidAuthOIDC', () => {
     let auth, providerUri
 
     beforeEach(() => {
-      auth = new SolidAuthOIDC()
+      auth = new SolidAuthOIDC({ store: localStorage })
       providerUri = 'https://provider.example.com'
     })
 
@@ -77,7 +78,8 @@ describe('SolidAuthOIDC', () => {
     let auth
 
     beforeEach(() => {
-      auth = new SolidAuthOIDC()
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ store: localStorage })
     })
 
     it('should clear the current user', () => {
@@ -131,7 +133,8 @@ describe('SolidAuthOIDC', () => {
   describe('providerFromCurrentUri()', () => {
     var auth
     beforeEach(() => {
-      auth = new SolidAuthOIDC({ window: { location: {} } })
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
     })
 
     it('should return null when no state param present', () => {
@@ -163,7 +166,8 @@ describe('SolidAuthOIDC', () => {
 
   describe('provider persistence', () => {
     it('should store and load provider uri, by state', () => {
-      let auth = new SolidAuthOIDC()
+      localStorage.clear()
+      let auth = new SolidAuthOIDC({ store: localStorage })
       let providerUri = 'https://provider.example.com'
       let state = 'abcd'
       // Check to see that provider doesn't exist initially
@@ -265,7 +269,8 @@ describe('SolidAuthOIDC', () => {
     var auth
 
     beforeEach(() => {
-      auth = new SolidAuthOIDC()
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ store: localStorage })
     })
 
     describe('loadClient()', () => {
@@ -290,8 +295,6 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should store and load serialized clients', () => {
-      let auth = new SolidAuthOIDC()
-
       auth.storeClient(mockClient, providerUri)
       // Storing a client should cache it in the auth client
       expect(auth.currentClient).to.equal(mockClient)
@@ -305,8 +308,12 @@ describe('SolidAuthOIDC', () => {
 
   describe('currentLocation()', () => {
     it('should return the current window uri', () => {
+      localStorage.clear()
+
       let currentUri = 'https://client-app.example.com'
-      let auth = new SolidAuthOIDC({ window: { location: { href: currentUri } } })
+      let auth = new SolidAuthOIDC({
+        window: { location: { href: currentUri } }, store: localStorage
+      })
 
       expect(auth.currentLocation()).to.equal(currentUri)
     })
@@ -357,7 +364,7 @@ describe('SolidAuthOIDC', () => {
 
     beforeEach(() => {
       localStorage.clear()
-      auth = new SolidAuthOIDC({ window: { location: {} } })
+      auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
     })
 
     it('should validate the auth response', () => {
@@ -385,8 +392,14 @@ describe('SolidAuthOIDC', () => {
   })
 
   describe('sendAuthRequest()', () => {
+    var auth
+
+    beforeEach(() => {
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
+    })
+
     it('should compose an auth request uri, save provider, and redirect', () => {
-      let auth = new SolidAuthOIDC({ window: { location: {} } })
       let state = 'abcd'
       let providerUri = 'https://provider.example.com'
       let authUri = `https://provider.example.com/authorize?state=${state}`
@@ -407,24 +420,27 @@ describe('SolidAuthOIDC', () => {
   })
 
   describe('currentUser()', () => {
+    var auth
+
+    beforeEach(() => {
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
+    })
+
     it('should return cached webId if present', () => {
       let aliceWebId = 'https://alice.example.com'
-      let auth = new SolidAuthOIDC()
       auth.webId = aliceWebId
 
       expect(auth.currentUser()).to.eventually.equal(aliceWebId)
     })
 
     it('should return null if no cached webId and no current state param', () => {
-      let auth = new SolidAuthOIDC({ window: { location: {} } })
-
       expect(auth.currentUser()).to.eventually.not.exist()
     })
 
     it('should automatically login if current uri has state param', () => {
       let state = 'abcd'
       let providerUri = 'https://provider.example.com'
-      let auth = new SolidAuthOIDC({ window: { location: {} } })
       auth.saveProviderByState(state, providerUri)
 
       auth.window.location.href = `https://client-app.example.com#state=${state}`
@@ -441,10 +457,11 @@ describe('SolidAuthOIDC', () => {
   })
 
   describe('providerEndSessionEndpoint()', () => {
-    let auth
+    var auth
 
     beforeEach(() => {
-      auth = new SolidAuthOIDC()
+      localStorage.clear()
+      auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
     })
 
     it('should return null if no current client', () => {
