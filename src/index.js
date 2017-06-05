@@ -40,11 +40,11 @@ class ClientAuthOIDC {
    * @constructor
    * @param [options={}]
    * @param [options.window=Window] Optionally inject global browser window
-   * @param [options.localStorage=localStorage] Optionally inject localStorage
+   * @param [options.store=localStorage] Optionally inject localStorage
    */
   constructor (options = {}) {
     this.window = options.window || global.window
-    this.localStorage = options.localStorage || global.localStorage
+    this.store = options.store || global.localStorage
 
     this.currentClient = null
     this.providerUri = null
@@ -180,7 +180,7 @@ class ClientAuthOIDC {
 
     // Check for client config stored locally
     let key = this.keyByProvider(providerUri)
-    let clientConfig = localStorage.getItem(key)
+    let clientConfig = this.store.getItem(key)
 
     if (clientConfig) {
       clientConfig = JSON.parse(clientConfig)
@@ -191,13 +191,13 @@ class ClientAuthOIDC {
   }
 
   /**
-   * Loads a provider's URI from localStorage, given a `state` uri param.
+   * Loads a provider's URI from store, given a `state` uri param.
    * @param state {string}
    * @return {string}
    */
   loadProvider (state) {
     let key = this.keyByState(state)
-    let providerUri = localStorage.getItem(key)
+    let providerUri = this.store.getItem(key)
     return providerUri
   }
 
@@ -355,7 +355,7 @@ class ClientAuthOIDC {
     let options = {}
     let providerUri = client.provider.url
 
-    return client.createRequest(options, this.localStorage)
+    return client.createRequest(options, this.store)
       .then(authUri => {
         let state = this.extractState(authUri, QUERY)
         if (!state) {
@@ -399,7 +399,7 @@ class ClientAuthOIDC {
    * @returns {Promise<string>} Current user's web id
    */
   initUserFromResponse (client) {
-    return client.validateResponse(this.currentLocation(), this.localStorage)
+    return client.validateResponse(this.currentLocation(), this.store)
       .then(response => {
         this.idToken = response.params.id_token
         this.accessToken = response.params.access_token
@@ -466,7 +466,6 @@ class ClientAuthOIDC {
    * @param [options={}]
    * @param [options.redirectUri] {string} Defaults to window.location.href
    * @param [options.scope='openid profile'] {string}
-   * @param [options.store=localStorage]
    * @throws {TypeError} If providerUri is missing
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
@@ -484,7 +483,6 @@ class ClientAuthOIDC {
    * @param [options={}]
    * @param [options.redirectUri] {string} Defaults to window.location.href
    * @param [options.scope='openid profile'] {string}
-   * @param [options.store=localStorage]
    * @throws {TypeError} If providerUri is missing
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
@@ -509,7 +507,7 @@ class ClientAuthOIDC {
           response_type: 'id_token token'
         }
       },
-      store: options.store || localStorage
+      store: this.store
     }
     return RelyingParty
       .register(providerUri, registration, rpOptions)
@@ -541,17 +539,17 @@ class ClientAuthOIDC {
       throw new Error('Cannot save providerUri - state not provided')
     }
     let key = this.keyByState(state)
-    localStorage.setItem(key, providerUri)
+    this.store.setItem(key, providerUri)
   }
 
   /**
-   * Stores a RelyingParty client for a given provider in localStorage.
+   * Stores a RelyingParty client for a given provider in the local store.
    * @param client {RelyingParty}
    * @param providerUri {string}
    */
   storeClient (client, providerUri) {
     this.currentClient = client
-    localStorage.setItem(this.keyByProvider(providerUri), client.serialize())
+    this.store.setItem(this.keyByProvider(providerUri), client.serialize())
   }
 }
 
