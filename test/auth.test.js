@@ -4,6 +4,7 @@ global.URL = require('url').URL
 global.URLSearchParams = require('url').URLSearchParams
 
 const localStorage = require('localstorage-memory')
+global.localStorage = localStorage
 
 const chai = require('chai')
 const sinon = require('sinon')
@@ -27,7 +28,44 @@ describe('SolidAuthOIDC', () => {
     auth = new SolidAuthOIDC({ window: { location: {} }, store: localStorage })
   })
 
+  describe('from()', () => {
+    it('should init an instance with default values', () => {
+      auth = SolidAuthOIDC.from({})
+
+      expect(auth.store).to.equal(global.localStorage)
+    })
+
+    it('should load current provider and credentials from storage', () => {
+      let credentials = {
+        webId: 'https://alice.example.com/#me',
+        accessToken: '1234',
+        idToken: '5678'
+      }
+
+      let prevSession = SolidAuthOIDC.from({ store: localStorage })
+      prevSession.saveCurrentProvider(providerUri)
+      prevSession.saveCurrentCredentials(credentials)
+
+      let nextSession = SolidAuthOIDC.from({ store: localStorage })
+
+      expect(nextSession.accessToken).to.eql(credentials.accessToken)
+      expect(nextSession.idToken).to.eql(credentials.idToken)
+
+      expect(nextSession.currentUser()).to.eventually.equal(credentials.webId)
+    })
+  })
+
   describe('login()', () => {
+    it('should return the current webId if one is already present', () => {
+      let aliceWebId = 'https://alice.example.com/#me'
+      auth.webId = aliceWebId
+
+      return auth.login(providerUri)
+        .then(webId => {
+          expect(webId).to.equal(aliceWebId)
+        })
+    })
+
     it('should invoke selectProvider() if provider uri is not given', () => {
       let selectProvider = sinon.stub(auth, 'selectProvider').resolves(null)
 
@@ -73,7 +111,7 @@ describe('SolidAuthOIDC', () => {
 
   describe('logout()', () => {
     it('should clear the current user', () => {
-      let clearCurrentUser = sinon.spy(auth, 'clearCurrentUser')
+      let clearCurrentUser = sinon.spy(auth, 'clearCurrentCredentials')
 
       auth.logout()
       expect(clearCurrentUser).to.have.been.called()
@@ -102,21 +140,6 @@ describe('SolidAuthOIDC', () => {
       expect(redirectTo)
         .to.have.been.calledWith('https://example.com/logout?returnToUrl=' +
           encodeURIComponent(currentUrl))
-    })
-  })
-
-  describe('keyByState()', () => {
-    it('should throw an error if no state param is passed to it', () => {
-      let auth = new SolidAuthOIDC()
-
-      expect(auth.keyByState).to.throw(/No state provided/)
-    })
-
-    it('should compose a key from the state param', () => {
-      let auth = new SolidAuthOIDC()
-      let key = auth.keyByState('abcd')
-
-      expect(key).to.equal('oidc.rp.by-state.abcd')
     })
   })
 
@@ -152,13 +175,20 @@ describe('SolidAuthOIDC', () => {
     it('should store and load provider uri, by state', () => {
       let state = 'abcd'
       // Check to see that provider doesn't exist initially
-      expect(auth.loadProvider(state)).to.not.exist()
+      expect(auth.loadProviderByState(state)).to.not.exist()
 
       // Save the provider uri to local storage
       auth.saveProviderByState(state, providerUri)
 
       // Check that it was saved and can be loaded
-      expect(auth.loadProvider(state)).to.equal(providerUri)
+      expect(auth.loadProviderByState(state)).to.equal(providerUri)
+    })
+
+    describe('saveProviderByState()', () => {
+      it('should throw an error if no state provided', () => {
+        expect(() => auth.saveProviderByState())
+          .to.throw(/Cannot save providerUri - state not provided/)
+      })
     })
   })
 
@@ -202,28 +232,26 @@ describe('SolidAuthOIDC', () => {
 
   describe('selectProvider()', () => {
     it('should pass through a given providerUri', () => {
-      expect(auth.selectProvider(providerUri)).to.eventually.equal(providerUri)
+      expect(auth.selectProvider(providerUri)).to.equal(providerUri)
     })
 
     it('should derive a provider from the current uri', () => {
       auth.providerFromCurrentUri = sinon.stub().returns(providerUri)
 
-      return auth.selectProvider()
-        .then(selectedProvider => {
-          expect(selectedProvider).to.equal(providerUri)
-          expect(auth.providerFromCurrentUri).to.have.been.called()
-        })
+      let selectedProvider = auth.selectProvider()
+
+      expect(selectedProvider).to.equal(providerUri)
+      expect(auth.providerFromCurrentUri).to.have.been.called()
     })
 
     it('should obtain provider from UI, if not present or cached', () => {
       auth.providerFromCurrentUri = sinon.stub().returns(null)
-      auth.providerFromUI = sinon.stub().resolves(providerUri)
+      auth.selectProviderUI = sinon.stub()
 
-      return auth.selectProvider()
-        .then(selectedProvider => {
-          expect(selectedProvider).to.equal(providerUri)
-          expect(auth.providerFromUI).to.have.been.called()
-        })
+      let selectedProvider = auth.selectProvider()
+
+      expect(auth.selectProviderUI).to.have.been.called()
+      expect(selectedProvider).to.be.undefined()
     })
   })
 
@@ -256,7 +284,7 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should store and load serialized clients', () => {
-      auth.storeClient(mockClient, providerUri)
+      auth.saveClient(mockClient, providerUri)
       // Storing a client should cache it in the auth client
       expect(auth.currentClient).to.equal(mockClient)
 
@@ -352,7 +380,7 @@ describe('SolidAuthOIDC', () => {
       auth.sendAuthRequest(mockClient)
         .then(() => {
           // ensure providerUri was saved
-          expect(auth.loadProvider(state)).to.equal(providerUri)
+          expect(auth.loadProviderByState(state)).to.equal(providerUri)
           // ensure the redirect happened
           expect(auth.currentLocation()).to.equal(authUri)
         })
@@ -360,8 +388,9 @@ describe('SolidAuthOIDC', () => {
   })
 
   describe('currentUser()', () => {
+    let aliceWebId = 'https://alice.example.com'
+
     it('should return cached webId if present', () => {
-      let aliceWebId = 'https://alice.example.com'
       auth.webId = aliceWebId
 
       expect(auth.currentUser()).to.eventually.equal(aliceWebId)
@@ -369,6 +398,13 @@ describe('SolidAuthOIDC', () => {
 
     it('should return null if no cached webId and no current state param', () => {
       expect(auth.currentUser()).to.eventually.not.exist()
+    })
+
+    it('should return webId saved in local store', () => {
+      auth.saveCurrentCredentials({ webId: aliceWebId })
+      auth.webId = null
+
+      expect(auth.currentUser()).to.eventually.equal(aliceWebId)
     })
 
     it('should automatically login if current uri has state param', () => {
@@ -492,6 +528,136 @@ describe('SolidAuthOIDC', () => {
       let url = auth.currentLocationNoHash()
 
       expect(url).to.equal('https://example.com/')
+    })
+  })
+
+  describe('initEventListeners()', () => {
+    let auth = new SolidAuthOIDC()
+
+    let window = {
+      addEventListener: sinon.stub()
+    }
+
+    auth.initEventListeners(window)
+
+    expect(window.addEventListener).to.have.been.calledWith('message')
+  })
+
+  describe('loadOrRegisterClient()', () => {
+    it('should attempt to load a saved client first', () => {
+      let client = { 'client_id': '1234' }
+
+      auth.loadClient = sinon.stub().withArgs(providerUri).resolves(client)
+
+      expect(auth.loadOrRegisterClient(providerUri))
+        .to.eventually.eql(client)
+    })
+
+    it('should attempt to register a client if none is saved', () => {
+      let client = { 'client_id': '1234' }
+
+      auth.loadClient = sinon.stub().resolves(null)
+      auth.registerClient = sinon.stub().withArgs(providerUri).resolves(client)
+
+      expect(auth.loadOrRegisterClient(providerUri))
+        .to.eventually.eql(client)
+    })
+  })
+
+  describe('registerClient()', () => {
+    it('should register a public client and save it', () => {
+      let client = { 'client_id': '1234' }
+
+      auth.registerPublicClient = sinon.stub().withArgs(providerUri).resolves(client)
+      auth.saveClient = sinon.stub()
+
+      return auth.registerClient(providerUri)
+        .then(registeredClient => {
+          expect(auth.registerPublicClient).to.have.been.calledWith(providerUri, {})
+          expect(auth.saveClient).to.have.been.calledWith(registeredClient, providerUri)
+          expect(registeredClient).to.equal(client)
+        })
+    })
+  })
+
+  describe('registerPublicClient()', () => {
+    it('should throw if no providerUri is given', done => {
+      auth.registerPublicClient()
+        .catch(err => {
+          expect(err.message)
+            .to.equal('Cannot registerClient auth client, missing providerUri')
+          done()
+        })
+    })
+
+    it('should register a relying party client', () => {
+      let currentUri = 'https://app.example.com'
+
+      auth.currentLocation = sinon.stub().returns(currentUri)
+      auth.registerRP = sinon.stub().resolves()
+
+      return auth.registerPublicClient(providerUri)
+        .then(() => {
+          expect(auth.registerRP).to.have.been.calledWith(providerUri)
+        })
+    })
+  })
+
+  describe('onMessage()', () => {
+    it('should dispatch to providerSelected on applicable event', () => {
+      auth.providerSelected = sinon.stub()
+
+      let event = {
+        data: { event_type: 'providerSelected', value: providerUri }
+      }
+
+      auth.onMessage(event)
+
+      expect(auth.providerSelected).to.have.been.calledWith(providerUri)
+    })
+
+    it('should do nothing but log an error message on all other events', () => {
+      sinon.spy(auth, 'providerSelected')
+
+      auth.debug = sinon.stub()
+
+      let event = { data: { event_type: 'something' } }
+
+      auth.onMessage(event)
+
+      expect(auth.providerSelected).to.not.have.been.called()
+      expect(auth.debug).to.have.been.called()
+    })
+  })
+
+  describe('providerSelected()', () => {
+    it('it should save the current provider', () => {
+      sinon.spy(auth, 'saveCurrentProvider')
+
+      auth.login = sinon.stub().resolves()
+      auth.selectProviderWindow = { close: sinon.stub() }
+
+      auth.providerSelected(providerUri)
+
+      expect(auth.saveCurrentProvider).to.have.been.calledWith(providerUri)
+    })
+
+    it('should login with selected provider', () => {
+      auth.login = sinon.stub().resolves()
+      auth.selectProviderWindow = { close: sinon.stub() }
+
+      auth.providerSelected(providerUri)
+
+      expect(auth.login).to.have.been.calledWith(providerUri)
+    })
+
+    it('should close the Select Provider window', () => {
+      auth.login = sinon.stub().resolves()
+      auth.selectProviderWindow = { close: sinon.stub() }
+
+      auth.providerSelected(providerUri)
+
+      expect(auth.selectProviderWindow.close).to.have.been.called()
     })
   })
 })

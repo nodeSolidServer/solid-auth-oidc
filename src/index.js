@@ -35,25 +35,102 @@ const QUERY = 'query'
 // AuthenticationRequest sending methods
 const REDIRECT = 'redirect'
 
+// Local storage keys
+const CURRENT_PROVIDER = 'solid.current-provider'
+const CURRENT_CREDENTIALS = 'solid.current-user'
+
+// Local storage key prefixes
+const RP_BY_PROVIDER = 'oidc.rp.by-provider.'
+const PROVIDER_BY_STATE = 'oidc.provider.by-state.'
+
 class ClientAuthOIDC {
   /**
    * @constructor
    * @param [options={}]
    * @param [options.window=Window] Optionally inject global browser window
    * @param [options.store=localStorage] Optionally inject localStorage
+   * @param [options.providerUri] {string} Previously selected provider uri
+   *   (typically loaded from storage)
+   * @param [options.redirectUri] {string} This app's callback redirect uri,
+   *   defaults to the current window's uri.
+   * @param [options.debug] {Function}
    */
   constructor (options = {}) {
     this.window = options.window || global.window
     this.store = options.store || global.localStorage
 
+    this.debug = options.debug || console.error.bind(console)
+
     this.currentClient = null
-    this.providerUri = null
-    this.webId = null
-    this.idToken = null
-    this.accessToken = null
+    this.providerUri = options.providerUri
+    this.redirectUri = options.redirectUri
+    this.webId = options.webId
+    this.idToken = options.idToken
+    this.accessToken = options.accessToken
     this.method = REDIRECT  // only redirect is currently supported
   }
 
+  /**
+   * Factory method, returns an auth client instance initialized with options
+   * or defaults (including loading stored credentials and current provider
+   * from local storage).
+   *
+   * @param options {Object} See constructor options
+   * @param [options.store=localStorage] {Store}
+   * @param [options.providerUri] {string}
+   *
+   * @returns {ClientAuthOIDC}
+   */
+  static from (options) {
+    let store = options.store || global.localStorage
+    let providerUri = options.providerUri || store.getItem(CURRENT_PROVIDER)
+
+    let { webId, idToken, accessToken } = ClientAuthOIDC.loadCurrentCredentials(store)
+
+    options = Object.assign({}, options, {
+      store,
+      providerUri,
+      webId,
+      idToken,
+      accessToken
+    })
+
+    return new ClientAuthOIDC(options)
+  }
+
+  /**
+   * Loads the saved user credentials from local storage.
+   *
+   * @static
+   * @param store {Store}
+   *
+   * @returns {Object} Credentials hashmap
+   */
+  static loadCurrentCredentials (store) {
+    let currentCredentials = store.getItem(CURRENT_CREDENTIALS)
+
+    if (!currentCredentials) { return {} }
+
+    return JSON.parse(currentCredentials)
+  }
+
+  /**
+   * Loads the saved user credentials from local storage.
+   *
+   * @returns {Object} Credentials hashmap
+   */
+  loadCurrentCredentials () {
+    let credentials = ClientAuthOIDC.loadCurrentCredentials(this.store)
+
+    this.setCurrentCredentials(credentials)
+  }
+
+  /**
+   * Sets up the onMessage window event listener (used by the Select Provider
+   * popup).
+   *
+   * @param window {Window}
+   */
   initEventListeners (window) {
     window.addEventListener('message', this.onMessage.bind(this))
   }
@@ -72,15 +149,52 @@ class ClientAuthOIDC {
   }
 
   /**
-   * @return {Promise<string>} Resolves to current user's WebID URI
+   * Returns the previously selected provider (cached on the object, saved in
+   * localStorage, or loaded from the callback uri using a previously stored
+   * state parameter).
+   *
+   * @return {string|null}
+   */
+  currentProvider () {
+    return this.providerUri ||
+      this.store.getItem(CURRENT_PROVIDER) ||
+      this.providerFromCurrentUri()
+  }
+
+  /**
+   * Saves the currently selected provider in storage.
+   *
+   * @param providerUri {string}
+   */
+  saveCurrentProvider (providerUri) {
+    this.providerUri = providerUri
+
+    this.store.setItem(CURRENT_PROVIDER, providerUri)
+  }
+
+  /**
+   * Resolves with the currently logged in user's WebID URI.
+   * Recommended to call this as soon as the page is loaded (or your framework
+   * ready event fires).
+   *
+   * Attempts to load the logged in webid from storage, or from the callback
+   * redirect uri (this is the part that requires an async operation).
+   *
+   * @return {Promise<string>} WebID URI
    */
   currentUser () {
     if (this.webId) {
       return Promise.resolve(this.webId)
     }
 
-    // Attempt to find a provider based on the 'state' param of the current URI
-    let providerUri = this.providerFromCurrentUri()
+    this.loadCurrentCredentials()
+    if (this.webId) {
+      return Promise.resolve(this.webId)
+    }
+
+    // Attempt to find a provider based either the cached value
+    // or on the 'state' param of the current URI
+    let providerUri = this.currentProvider()
 
     if (providerUri) {
       return this.login(providerUri)
@@ -133,18 +247,10 @@ class ClientAuthOIDC {
     return state
   }
 
-  keyByProvider (providerUri) {
-    return `oidc.rp.by-provider.${providerUri}`
-  }
-
-  keyByState (state) {
-    if (!state) {
-      throw new TypeError('No state provided to keyByState()')
-    }
-    return `oidc.rp.by-state.${state}`
-  }
-
   /**
+   * Loads a previously registered RP client for a given provider from storage,
+   * or registers and saves one if none exists.
+   *
    * @param providerUri {string}
    *
    * @return {Promise<RelyingParty>}
@@ -158,19 +264,21 @@ class ClientAuthOIDC {
           this.currentClient = loadedClient
           return loadedClient
         } else {
-          this.currentClient = null
           return this.registerClient(providerUri)
         }
       })
   }
 
   /**
+   * Loads a previously registered RP client for a given provider from storage.
+   *
    * @param providerUri {string}
+   *
    * @return {Promise<RelyingParty>}
    */
   loadClient (providerUri) {
     if (!providerUri) {
-      let error = new Error('Cannot load or register client, providerURI missing')
+      let error = new Error('Cannot load or register client, providerUri missing')
       return Promise.reject(error)
     }
     if (this.currentClient && this.currentClient.provider.url === providerUri) {
@@ -179,7 +287,7 @@ class ClientAuthOIDC {
     }
 
     // Check for client config stored locally
-    let key = this.keyByProvider(providerUri)
+    let key = RP_BY_PROVIDER + providerUri
     let clientConfig = this.store.getItem(key)
 
     if (clientConfig) {
@@ -191,12 +299,25 @@ class ClientAuthOIDC {
   }
 
   /**
+   * Stores a RelyingParty client for a given provider in the local store.
+   *
+   * @param client {RelyingParty}
+   * @param providerUri {string}
+   */
+  saveClient (client, providerUri) {
+    this.currentClient = client
+    this.store.setItem(RP_BY_PROVIDER + providerUri, client.serialize())
+  }
+
+  /**
    * Loads a provider's URI from store, given a `state` uri param.
+   *
    * @param state {string}
+   *
    * @return {string}
    */
-  loadProvider (state) {
-    let key = this.keyByState(state)
+  loadProviderByState (state) {
+    let key = PROVIDER_BY_STATE + state
     let providerUri = this.store.getItem(key)
     return providerUri
   }
@@ -213,7 +334,12 @@ class ClientAuthOIDC {
    * @return {Promise<string>} Resolves to the logged in user's WebID URI
    */
   login (providerUri) {
-    this.clearCurrentUser()
+    if (this.webId) {
+      // Already logged in, or loaded from storage during instantiation
+      return Promise.resolve(this.webId)
+    }
+
+    this.clearCurrentCredentials()
 
     return Promise.resolve(providerUri)
       .then(providerUri => this.selectProvider(providerUri))
@@ -229,7 +355,34 @@ class ClientAuthOIDC {
       })
   }
 
-  clearCurrentUser () {
+  /**
+   * Saves given user credentials in storage.
+   *
+   * @param {Object} options
+   */
+  saveCurrentCredentials (options) {
+    this.setCurrentCredentials(options)
+    this.store.setItem(CURRENT_CREDENTIALS, JSON.stringify(options))
+  }
+
+  /**
+   * Initializes user credentials on the client instance.
+   *
+   * @param {Object} options
+   */
+  setCurrentCredentials (options) {
+    this.webId = options.webId
+    this.accessToken = options.accessToken
+    this.idToken = options.idToken
+  }
+
+  /**
+   * Clears current user credential from storage and client instance.
+   * Used by logout(), etc.
+   */
+  clearCurrentCredentials () {
+    this.store.removeItem(CURRENT_CREDENTIALS)
+
     this.webId = null
     this.accessToken = null
     this.idToken = null
@@ -242,9 +395,9 @@ class ClientAuthOIDC {
    * clear any http-only session cookies.
    */
   logout () {
-    this.clearCurrentUser()
-
     let logoutEndpoint = this.providerEndSessionEndpoint()
+
+    this.clearCurrentCredentials()
 
     if (!logoutEndpoint) { return }
 
@@ -269,21 +422,18 @@ class ClientAuthOIDC {
    *
    * @param [providerUri] {string} If the provider URI is already known to the
    *   app developer, just pass it through, no need to take further action.
-   * @return {Promise<string>}
+   *
+   * @return {string|null}
    */
   selectProvider (providerUri) {
+    providerUri = providerUri || this.currentProvider()
+
     if (providerUri) {
-      return Promise.resolve(providerUri)
+      return providerUri
     }
 
-    // Attempt to find a provider based on the 'state' param of the current URI
-    providerUri = this.providerFromCurrentUri()
-    if (providerUri) {
-      return Promise.resolve(providerUri)
-    }
-
-    // Lastly, kick off a Select Provider popup window workflow
-    return this.providerFromUI()
+    // If not available, kick off a Select Provider popup window workflow
+    this.selectProviderUI()
   }
 
   /**
@@ -297,15 +447,20 @@ class ClientAuthOIDC {
     let currentUri = this.currentLocation()
     let stateParam = this.extractState(currentUri, HASH)
 
-    if (stateParam) {
-      return this.loadProvider(stateParam)
-    } else {
-      return null
-    }
+    if (!stateParam) { return null }
+
+    let providerUri = this.loadProviderByState(stateParam)
+
+    this.saveCurrentProvider(providerUri)
+
+    return providerUri
   }
 
-  providerFromUI () {
-    console.log('Getting provider from default popup UI')
+  /**
+   * Opens a Select Provider popup window, initializes events.
+   */
+  selectProviderUI () {
+    this.debug('Getting provider from default popup UI')
     this.initEventListeners(this.window)
 
     if (this.selectProviderWindow) {
@@ -326,6 +481,7 @@ class ClientAuthOIDC {
   /**
    * Tests whether the current URI is the result of an AuthenticationRequest
    * return redirect.
+   *
    * @return {boolean}
    */
   currentUriHasAuthResponse () {
@@ -337,6 +493,7 @@ class ClientAuthOIDC {
 
   /**
    * Redirects the current window to the given uri.
+   *
    * @param uri {string}
    */
   redirectTo (uri) {
@@ -358,13 +515,10 @@ class ClientAuthOIDC {
     return client.createRequest(options, this.store)
       .then(authUri => {
         let state = this.extractState(authUri, QUERY)
-        if (!state) {
-          throw new Error('Invalid authentication request uri')
-        }
+
         this.saveProviderByState(state, providerUri)
-        if (this.method === REDIRECT) {
-          return this.redirectTo(authUri)
-        }
+
+        return this.redirectTo(authUri)
       })
   }
 
@@ -399,19 +553,28 @@ class ClientAuthOIDC {
    * @returns {Promise<string>} Current user's web id
    */
   initUserFromResponse (client) {
+    let credentials = {}
+
     return client.validateResponse(this.currentLocation(), this.store)
       .then(response => {
-        this.idToken = response.params.id_token
-        this.accessToken = response.params.access_token
+        credentials.idToken = response.params.id_token
+        credentials.accessToken = response.params.access_token
 
         this.clearAuthResponseFromUrl()
 
         return this.extractAndValidateWebId(response.decoded)
       })
+      .then(webId => {
+        credentials.webId = webId
+
+        this.saveCurrentCredentials(credentials)
+
+        return webId
+      })
       .catch(error => {
         this.clearAuthResponseFromUrl()
         if (error.message === 'Cannot resolve signing key for ID Token.') {
-          console.log('ID Token found, but could not validate. Provider likely has changed their public keys. Please retry login.')
+          this.debug('ID Token found, but could not validate. Provider likely has changed their public keys. Please retry login.')
           return null
         } else {
           throw error
@@ -442,6 +605,12 @@ class ClientAuthOIDC {
     this.replaceCurrentUrl(clearedUrl)
   }
 
+  /**
+   * Returns the current window URL without the hash fragment, or null if none
+   * is available.
+   *
+   * @return {string|null}
+   */
   currentLocationNoHash () {
     let currentLocation = this.currentLocation()
     if (!currentLocation) { return null }
@@ -453,6 +622,12 @@ class ClientAuthOIDC {
     return clearedUrl
   }
 
+  /**
+   * Replaces the current document's URL (used to clear the credentials in
+   * the hash fragment after a redirect from the provider).
+   *
+   * @param newUrl {string}
+   */
   replaceCurrentUrl (newUrl) {
     let history = this.window.history
 
@@ -462,37 +637,49 @@ class ClientAuthOIDC {
   }
 
   /**
+   * Registers and saves a relying party client.
+   *
    * @param providerUri {string}
    * @param [options={}]
    * @param [options.redirectUri] {string} Defaults to window.location.href
    * @param [options.scope='openid profile'] {string}
-   * @throws {TypeError} If providerUri is missing
+   *
+   * @throws {Error} If providerUri is missing
+   *
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
   registerClient (providerUri, options = {}) {
     return this.registerPublicClient(providerUri, options)
       .then(registeredClient => {
-        this.storeClient(registeredClient, providerUri)
+        this.saveClient(registeredClient, providerUri)
         return registeredClient
       })
   }
 
   /**
+   * Registers a public RP client (public in the OAuth2 sense, one not capable
+   * of storing its own `client_secret` securely, meaning a javascript web app,
+   * a desktop or a mobile client).
+   *
    * @private
    * @param providerUri {string}
    * @param [options={}]
    * @param [options.redirectUri] {string} Defaults to window.location.href
    * @param [options.scope='openid profile'] {string}
-   * @throws {TypeError} If providerUri is missing
+   *
+   * @throws {Error} If providerUri is missing
+   *
    * @return {Promise<RelyingParty>} Registered RelyingParty client instance
    */
   registerPublicClient (providerUri, options = {}) {
-    console.log('Registering public client...')
+    this.debug('Registering public client...')
     if (!providerUri) {
-      throw new TypeError('Cannot registerClient auth client, missing providerUri')
+      let error = new Error('Cannot registerClient auth client, missing providerUri')
+      return Promise.reject(error)
     }
-    let redirectUri = options.redirectUri || this.currentLocation()
-    this.redirectUri = redirectUri
+
+    let redirectUri = options.redirectUri || this.redirectUri || this.currentLocation()
+
     let registration = {
       issuer: providerUri,
       grant_types: ['implicit'],
@@ -509,48 +696,80 @@ class ClientAuthOIDC {
       },
       store: this.store
     }
-    return RelyingParty
-      .register(providerUri, registration, rpOptions)
+
+    return this.registerRP(providerUri, registration, rpOptions)
   }
 
+  /**
+   * Performs the RP registration operation (discovers the provider settings,
+   * loads its keys, makes the Dynamic Registration call).
+   *
+   * @param providerUri {string}
+   * @param registration {Object}
+   * @param rpOptions {Object}
+   *
+   * @return {RelyingParty}
+   */
+  registerRP (providerUri, registration, rpOptions) {
+    return RelyingParty.register(providerUri, registration, rpOptions)
+  }
+
+  /**
+   * Dispatches this app's window message events. Used by the Select Provider
+   * popup to send events back to the main window.
+   *
+   * @param event
+   */
   onMessage (event) {
-    console.log('Auth client received event: ', event)
-    if (!event || !event.data) { return }
     switch (event.data.event_type) {
       case 'providerSelected':
-        let providerUri = event.data.value
-        console.log('Provider selected: ', providerUri)
-        this.login(providerUri)
-        this.selectProviderWindow.close()
+        this.providerSelected(event.data.value)
+
         break
       default:
-        console.error('onMessage - unknown event type: ', event)
+        this.debug('onMessage - unknown event type: ', event)
+
         break
     }
   }
 
   /**
+   * Dispatches the appropriate actions after the user selects a provider --
+   * saves the provider uri, attempts to perform a login, and closes the Provider
+   * Select window.
+   *
+   * @param providerUri {string}
+   */
+  providerSelected (providerUri) {
+    this.debug('Provider selected: ', providerUri)
+
+    this.saveCurrentProvider(providerUri)
+
+    this.login(providerUri)
+
+    this.selectProviderWindow.close()
+  }
+
+  /**
+   * Saves a provider uri in storage for a given state parameter. Used to identify
+   * which provider a callback redirect is from, afterwards.
+   *
    * @param state {string}
    * @param providerUri {string}
+   *
    * @throws {Error}
    */
   saveProviderByState (state, providerUri) {
     if (!state) {
       throw new Error('Cannot save providerUri - state not provided')
     }
-    let key = this.keyByState(state)
+
+    let key = PROVIDER_BY_STATE + state
     this.store.setItem(key, providerUri)
   }
-
-  /**
-   * Stores a RelyingParty client for a given provider in the local store.
-   * @param client {RelyingParty}
-   * @param providerUri {string}
-   */
-  storeClient (client, providerUri) {
-    this.currentClient = client
-    this.store.setItem(this.keyByProvider(providerUri), client.serialize())
-  }
 }
+
+ClientAuthOIDC.CURRENT_PROVIDER = CURRENT_PROVIDER
+ClientAuthOIDC.CURRENT_CREDENTIALS = CURRENT_CREDENTIALS
 
 module.exports = ClientAuthOIDC
