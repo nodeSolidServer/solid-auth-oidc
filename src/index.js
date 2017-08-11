@@ -25,7 +25,7 @@
  https://github.com/solid/solid
  */
 'use strict'
-const RelyingParty = require('oidc-rp')
+const RelyingParty = require('@trust/oidc-rp')
 const providerSelectPopupSource = require('./provider-select-popup')
 
 // URI parameter types
@@ -401,8 +401,9 @@ class ClientAuthOIDC {
   initUserFromResponse (client) {
     return client.validateResponse(this.currentLocation(), this.store)
       .then(response => {
-        this.idToken = response.params.id_token
-        this.accessToken = response.params.access_token
+        this.idToken = response.idToken
+        this.accessToken = response.accessToken
+        this.session = response
 
         this.clearAuthResponseFromUrl()
 

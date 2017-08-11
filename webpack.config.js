@@ -15,6 +15,7 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
+        exclude: /(node_modules)/,
         query: {
           presets: ['es2015']
         }
@@ -25,7 +26,7 @@ module.exports = {
     'node-fetch': 'fetch',
     'text-encoding': 'TextEncoder',
     'urlutils': 'URL',
-    'webcrypto': 'crypto'
+    '@trust/webcrypto': 'crypto'
   },
   devtool: 'source-map'
 }

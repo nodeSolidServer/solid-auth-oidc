@@ -1,7 +1,7 @@
 'use strict'
 
-global.URL = require('url').URL
-global.URLSearchParams = require('url').URLSearchParams
+global.URL = require('whatwg-url').URL
+global.URLSearchParams = require('whatwg-url').URLSearchParams
 
 const localStorage = require('localstorage-memory')
 
