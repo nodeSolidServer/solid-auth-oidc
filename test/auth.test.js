@@ -17,6 +17,7 @@ chai.should()
 const expect = chai.expect
 
 const SolidAuthOIDC = require('../src/index')
+const PoPToken = require('@trust/oidc-rp/lib/PoPToken')
 
 describe('SolidAuthOIDC', () => {
   var auth
@@ -492,6 +493,27 @@ describe('SolidAuthOIDC', () => {
       let url = auth.currentLocationNoHash()
 
       expect(url).to.equal('https://example.com/')
+    })
+  })
+
+  describe('issuePoPTokenFor()', () => {
+    before(() => {
+      sinon.stub(PoPToken, 'issueFor').resolves()
+    })
+
+    after(() => {
+      PoPToken.issueFor.restore()
+    })
+
+    it('should invoke PoPToken.issueFor', () => {
+      let auth = new SolidAuthOIDC()
+      let uri = 'https://rs.com'
+      let session = {}
+
+      return auth.issuePoPTokenFor(uri, session)
+        .then(() => {
+          expect(PoPToken.issueFor).to.have.been.calledWith(uri, session)
+        })
     })
   })
 })

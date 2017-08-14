@@ -26,6 +26,7 @@
  */
 'use strict'
 const RelyingParty = require('@trust/oidc-rp')
+const PoPToken = require('@trust/oidc-rp/lib/PoPToken')
 const providerSelectPopupSource = require('./provider-select-popup')
 
 // URI parameter types
@@ -386,6 +387,10 @@ class ClientAuthOIDC {
     }
 
     return this.sendAuthRequest(client)
+  }
+
+  issuePoPTokenFor (uri, session) {
+    return PoPToken.issueFor(uri, session)
   }
 
   /**
