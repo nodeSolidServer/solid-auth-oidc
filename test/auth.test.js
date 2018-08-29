@@ -17,7 +17,7 @@ chai.should()
 const expect = chai.expect
 
 const SolidAuthOIDC = require('../src/index')
-const PoPToken = require('@trust/oidc-rp/lib/PoPToken')
+const PoPToken = require('@solid/oidc-rp/lib/PoPToken')
 
 describe('SolidAuthOIDC', () => {
   var auth
