@@ -318,12 +318,12 @@ describe('SolidAuthOIDC', () => {
     it('should validate the auth response', () => {
       let aliceWebId = 'https://alice.example.com/'
       let authResponse = {
-        params: {
+        authorization: {
           id_token: 'sample.id.token',
           access_token: 'sample.access.token'
         },
-        decoded: {
-          payload: { sub: aliceWebId }
+        idClaims: {
+          sub: aliceWebId
         }
       }
       let validateResponseStub = sinon.stub().resolves(authResponse)
