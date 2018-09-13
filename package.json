@@ -56,7 +56,7 @@
   },
   "homepage": "https://github.com/solid/solid-auth-oidc",
   "dependencies": {
-    "@solid/oidc-rp": "^0.7.1"
+    "@solid/oidc-rp": "^0.8.0"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
