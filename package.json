@@ -1,6 +1,6 @@
 {
   "name": "@solid/solid-auth-oidc",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "engines": {
     "node": ">= 6.0"
   },
