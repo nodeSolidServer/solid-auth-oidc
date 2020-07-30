@@ -52,7 +52,7 @@ class ClientAuthOIDC {
     this.webId = null
     this.idToken = null
     this.accessToken = null
-    this.method = REDIRECT  // only redirect is currently supported
+    this.method = REDIRECT // only redirect is currently supported
   }
 
   initEventListeners (window) {
@@ -65,7 +65,7 @@ class ClientAuthOIDC {
    * @return {string|null}
    */
   currentLocation () {
-    let window = this.window
+    const window = this.window
 
     if (!window || !window.location) { return null }
 
@@ -81,7 +81,7 @@ class ClientAuthOIDC {
     }
 
     // Attempt to find a provider based on the 'state' param of the current URI
-    let providerUri = this.providerFromCurrentUri()
+    const providerUri = this.providerFromCurrentUri()
 
     if (providerUri) {
       return this.login(providerUri)
@@ -97,11 +97,11 @@ class ClientAuthOIDC {
    * @return {string|null}
    */
   providerEndSessionEndpoint () {
-    let rp = this.currentClient
+    const rp = this.currentClient
 
     if (!rp || !rp.provider || !rp.provider.configuration) { return null }
 
-    let config = rp.provider.configuration
+    const config = rp.provider.configuration
 
     if (!config.end_session_endpoint) { return null }
 
@@ -118,12 +118,12 @@ class ClientAuthOIDC {
    */
   extractState (uri, uriType = HASH) {
     if (!uri) { return null }
-    let uriObj = new URL(uri)
+    const uriObj = new URL(uri)
     let state
 
     if (uriType === HASH) {
-      let hash = uriObj.hash || '#'
-      let params = new URLSearchParams(hash.substr(1))
+      const hash = uriObj.hash || '#'
+      const params = new URLSearchParams(hash.substr(1))
       state = params.get('state')
     }
 
@@ -171,7 +171,7 @@ class ClientAuthOIDC {
    */
   loadClient (providerUri) {
     if (!providerUri) {
-      let error = new Error('Cannot load or register client, providerURI missing')
+      const error = new Error('Cannot load or register client, providerURI missing')
       return Promise.reject(error)
     }
     if (this.currentClient && this.currentClient.provider.url === providerUri) {
@@ -180,7 +180,7 @@ class ClientAuthOIDC {
     }
 
     // Check for client config stored locally
-    let key = this.keyByProvider(providerUri)
+    const key = this.keyByProvider(providerUri)
     let clientConfig = this.store.getItem(key)
 
     if (clientConfig) {
@@ -197,8 +197,8 @@ class ClientAuthOIDC {
    * @return {string}
    */
   loadProvider (state) {
-    let key = this.keyByState(state)
-    let providerUri = this.store.getItem(key)
+    const key = this.keyByState(state)
+    const providerUri = this.store.getItem(key)
     return providerUri
   }
 
@@ -245,11 +245,11 @@ class ClientAuthOIDC {
   logout () {
     this.clearCurrentUser()
 
-    let logoutEndpoint = this.providerEndSessionEndpoint()
+    const logoutEndpoint = this.providerEndSessionEndpoint()
 
     if (!logoutEndpoint) { return }
 
-    let logoutUrl = new URL(logoutEndpoint)
+    const logoutUrl = new URL(logoutEndpoint)
 
     logoutUrl.searchParams.set('returnToUrl', this.currentLocation())
 
@@ -295,8 +295,8 @@ class ClientAuthOIDC {
    * @return {string|null} Provider URI, if present
    */
   providerFromCurrentUri () {
-    let currentUri = this.currentLocation()
-    let stateParam = this.extractState(currentUri, HASH)
+    const currentUri = this.currentLocation()
+    const stateParam = this.extractState(currentUri, HASH)
 
     if (stateParam) {
       return this.loadProvider(stateParam)
@@ -330,8 +330,8 @@ class ClientAuthOIDC {
    * @return {boolean}
    */
   currentUriHasAuthResponse () {
-    let currentUri = this.currentLocation()
-    let stateParam = this.extractState(currentUri, HASH)
+    const currentUri = this.currentLocation()
+    const stateParam = this.extractState(currentUri, HASH)
 
     return !!stateParam
   }
@@ -353,12 +353,12 @@ class ClientAuthOIDC {
    * @return {Promise<null>}
    */
   sendAuthRequest (client) {
-    let options = {}
-    let providerUri = client.provider.url
+    const options = {}
+    const providerUri = client.provider.url
 
     return client.createRequest(options, this.store)
       .then(authUri => {
-        let state = this.extractState(authUri, QUERY)
+        const state = this.extractState(authUri, QUERY)
         if (!state) {
           throw new Error('Invalid authentication request uri')
         }
@@ -378,7 +378,7 @@ class ClientAuthOIDC {
    */
   validateOrSendAuthRequest (client) {
     if (!client) {
-      let error = new Error('Could not load or register a RelyingParty client')
+      const error = new Error('Could not load or register a RelyingParty client')
       return Promise.reject(error)
     }
 
@@ -433,7 +433,7 @@ class ClientAuthOIDC {
    * @return {string}
    */
   extractAndValidateWebId (idToken) {
-    let webId = idToken
+    const webId = idToken
     this.webId = webId
     return webId
   }
@@ -443,24 +443,24 @@ class ClientAuthOIDC {
    * the current url's hash fragment.
    */
   clearAuthResponseFromUrl () {
-    let clearedUrl = this.currentLocationNoHash()
+    const clearedUrl = this.currentLocationNoHash()
 
     this.replaceCurrentUrl(clearedUrl)
   }
 
   currentLocationNoHash () {
-    let currentLocation = this.currentLocation()
+    const currentLocation = this.currentLocation()
     if (!currentLocation) { return null }
 
-    let currentUrl = new URL(this.currentLocation())
-    currentUrl.hash = ''  // remove the hash fragment
-    let clearedUrl = currentUrl.toString()
+    const currentUrl = new URL(this.currentLocation())
+    currentUrl.hash = '' // remove the hash fragment
+    const clearedUrl = currentUrl.toString()
 
     return clearedUrl
   }
 
   replaceCurrentUrl (newUrl) {
-    let history = this.window.history
+    const history = this.window.history
 
     if (!history) { return }
 
@@ -497,16 +497,16 @@ class ClientAuthOIDC {
     if (!providerUri) {
       throw new TypeError('Cannot registerClient auth client, missing providerUri')
     }
-    let redirectUri = options.redirectUri || this.currentLocation()
+    const redirectUri = options.redirectUri || this.currentLocation()
     this.redirectUri = redirectUri
-    let registration = {
+    const registration = {
       issuer: providerUri,
       grant_types: ['implicit'],
-      redirect_uris: [ redirectUri ],
+      redirect_uris: [redirectUri],
       response_types: ['id_token token'],
       scope: options.scope || 'openid profile'
     }
-    let rpOptions = {
+    const rpOptions = {
       defaults: {
         authenticate: {
           redirect_uri: redirectUri,
@@ -524,7 +524,7 @@ class ClientAuthOIDC {
     if (!event || !event.data) { return }
     switch (event.data.event_type) {
       case 'providerSelected':
-        let providerUri = event.data.value
+        const providerUri = event.data.value
         console.log('Provider selected: ', providerUri)
         this.login(providerUri)
         this.selectProviderWindow.close()
@@ -544,7 +544,7 @@ class ClientAuthOIDC {
     if (!state) {
       throw new Error('Cannot save providerUri - state not provided')
     }
-    let key = this.keyByState(state)
+    const key = this.keyByState(state)
     this.store.setItem(key, providerUri)
   }
 

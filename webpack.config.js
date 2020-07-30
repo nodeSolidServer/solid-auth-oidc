@@ -25,7 +25,7 @@ module.exports = {
   externals: {
     'node-fetch': 'fetch',
     'text-encoding': 'TextEncoder',
-    'urlutils': 'URL',
+    urlutils: 'URL',
     '@trust/webcrypto': 'crypto'
   },
   devtool: 'source-map'

@@ -30,7 +30,7 @@ describe('SolidAuthOIDC', () => {
 
   describe('login()', () => {
     it('should invoke selectProvider() if provider uri is not given', () => {
-      let selectProvider = sinon.stub(auth, 'selectProvider').resolves(null)
+      const selectProvider = sinon.stub(auth, 'selectProvider').resolves(null)
 
       return auth.login()
         .then(() => {
@@ -39,7 +39,7 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should invoke selectProvider() with a given provider uri', () => {
-      let selectProvider = sinon.stub(auth, 'selectProvider').resolves(null)
+      const selectProvider = sinon.stub(auth, 'selectProvider').resolves(null)
 
       return auth.login(providerUri)
         .then(() => {
@@ -48,7 +48,7 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should load a client for a given provider uri', () => {
-      let loadOrRegisterClient = sinon.stub(auth, 'loadOrRegisterClient')
+      const loadOrRegisterClient = sinon.stub(auth, 'loadOrRegisterClient')
         .resolves(null)
 
       return auth.login(providerUri)
@@ -58,12 +58,12 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should validate a loaded client for a given provider uri', () => {
-      let mockClient = {}
+      const mockClient = {}
 
-      let loadOrRegisterClient = sinon.stub(auth, 'loadOrRegisterClient')
+      const loadOrRegisterClient = sinon.stub(auth, 'loadOrRegisterClient')
         .resolves(mockClient)
 
-      let validateStub = sinon.stub(auth, 'validateOrSendAuthRequest')
+      const validateStub = sinon.stub(auth, 'validateOrSendAuthRequest')
 
       return auth.login(providerUri)
         .then(() => {
@@ -74,14 +74,14 @@ describe('SolidAuthOIDC', () => {
 
   describe('logout()', () => {
     it('should clear the current user', () => {
-      let clearCurrentUser = sinon.spy(auth, 'clearCurrentUser')
+      const clearCurrentUser = sinon.spy(auth, 'clearCurrentUser')
 
       auth.logout()
       expect(clearCurrentUser).to.have.been.called()
     })
 
     it('should not redirect if no current client exists', () => {
-      let redirectTo = sinon.spy(auth, 'redirectTo')
+      const redirectTo = sinon.spy(auth, 'redirectTo')
 
       auth.logout()
       expect(redirectTo).to.not.have.been.called()
@@ -90,13 +90,13 @@ describe('SolidAuthOIDC', () => {
     it('should redirect to the provider end session endpoint', () => {
       auth.window = { location: {} }
 
-      let logoutEndpoint = 'https://example.com/logout'
+      const logoutEndpoint = 'https://example.com/logout'
       auth.providerEndSessionEndpoint = sinon.stub().returns(logoutEndpoint)
 
-      let currentUrl = 'https://rp.com'
+      const currentUrl = 'https://rp.com'
       auth.currentLocation = sinon.stub().returns(currentUrl)
 
-      let redirectTo = sinon.spy(auth, 'redirectTo')
+      const redirectTo = sinon.spy(auth, 'redirectTo')
 
       auth.logout()
 
@@ -108,14 +108,14 @@ describe('SolidAuthOIDC', () => {
 
   describe('keyByState()', () => {
     it('should throw an error if no state param is passed to it', () => {
-      let auth = new SolidAuthOIDC()
+      const auth = new SolidAuthOIDC()
 
       expect(auth.keyByState).to.throw(/No state provided/)
     })
 
     it('should compose a key from the state param', () => {
-      let auth = new SolidAuthOIDC()
-      let key = auth.keyByState('abcd')
+      const auth = new SolidAuthOIDC()
+      const key = auth.keyByState('abcd')
 
       expect(key).to.equal('oidc.rp.by-state.abcd')
     })
@@ -124,26 +124,26 @@ describe('SolidAuthOIDC', () => {
   describe('providerFromCurrentUri()', () => {
     it('should return null when no state param present', () => {
       auth.window.location.href = 'https://client-app.example.com'
-      let providerUri = auth.providerFromCurrentUri()
+      const providerUri = auth.providerFromCurrentUri()
 
       expect(providerUri).to.not.exist()
     })
 
     it('should return null if no provider was saved', () => {
-      let state = 'abcd'
+      const state = 'abcd'
       auth.window.location.href = `https://client-app.example.com#state=${state}`
-      let loadedProviderUri = auth.providerFromCurrentUri()
+      const loadedProviderUri = auth.providerFromCurrentUri()
 
       expect(loadedProviderUri).to.not.exist()
     })
 
     it('should load provider from current uri state param', () => {
-      let providerUri = 'https://provider.example.com'
-      let state = 'abcd'
+      const providerUri = 'https://provider.example.com'
+      const state = 'abcd'
       auth.saveProviderByState(state, providerUri)
       auth.window.location.href = `https://client-app.example.com#state=${state}`
 
-      let loadedProviderUri = auth.providerFromCurrentUri()
+      const loadedProviderUri = auth.providerFromCurrentUri()
 
       expect(loadedProviderUri).to.equal(providerUri)
     })
@@ -151,7 +151,7 @@ describe('SolidAuthOIDC', () => {
 
   describe('provider persistence', () => {
     it('should store and load provider uri, by state', () => {
-      let state = 'abcd'
+      const state = 'abcd'
       // Check to see that provider doesn't exist initially
       expect(auth.loadProvider(state)).to.not.exist()
 
@@ -165,13 +165,13 @@ describe('SolidAuthOIDC', () => {
 
   describe('extractState()', () => {
     it('should return null when no uri is provided', () => {
-      let state = auth.extractState()
+      const state = auth.extractState()
 
       expect(state).to.not.exist()
     })
 
     it('should return null when uri has no query or hash fragment', () => {
-      let state = auth.extractState('https://example.com')
+      const state = auth.extractState('https://example.com')
 
       expect(state).to.not.exist()
     })
@@ -190,7 +190,7 @@ describe('SolidAuthOIDC', () => {
 
     it('should extract the state param from hash fragments', () => {
       let uri = 'https://example.com#param1=value1&state=abcd'
-      let state = auth.extractState(uri)  // 'hash' is the default second param
+      let state = auth.extractState(uri) // 'hash' is the default second param
 
       expect(state).to.equal('abcd')
 
@@ -229,8 +229,8 @@ describe('SolidAuthOIDC', () => {
   })
 
   describe('client persistence', () => {
-    let clientConfig = { provider: { url: providerUri }}
-    let mockClient = {
+    const clientConfig = { provider: { url: providerUri } }
+    const mockClient = {
       provider: { url: providerUri },
       serialize: () => { return clientConfig }
     }
@@ -247,7 +247,7 @@ describe('SolidAuthOIDC', () => {
       })
 
       it('should NOT return cached client if for different provider', () => {
-        let providerUri = 'https://provider.example.com'
+        const providerUri = 'https://provider.example.com'
         auth.currentClient = {
           provider: { url: 'https://another.provider.com' }
         }
@@ -272,8 +272,8 @@ describe('SolidAuthOIDC', () => {
     it('should return the current window uri', () => {
       localStorage.clear()
 
-      let currentUri = 'https://client-app.example.com'
-      let auth = new SolidAuthOIDC({
+      const currentUri = 'https://client-app.example.com'
+      const auth = new SolidAuthOIDC({
         window: { location: { href: currentUri } }, store: localStorage
       })
 
@@ -288,12 +288,12 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should init user from auth response if present in current uri', () => {
-      let state = 'abcd'
+      const state = 'abcd'
       auth.window.location.href = `https://client-app.example.com#state=${state}`
-      let aliceWebId = 'https://alice.example.com/'
-      let initUserFromResponseStub = sinon.stub().resolves(aliceWebId)
+      const aliceWebId = 'https://alice.example.com/'
+      const initUserFromResponseStub = sinon.stub().resolves(aliceWebId)
       auth.initUserFromResponse = initUserFromResponseStub
-      let mockClient = {}
+      const mockClient = {}
 
       return auth.validateOrSendAuthRequest(mockClient)
         .then(webId => {
@@ -303,9 +303,9 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should send an auth request if no auth response in current uri', () => {
-      let sendAuthRequestStub = sinon.stub().resolves(null)
+      const sendAuthRequestStub = sinon.stub().resolves(null)
       auth.sendAuthRequest = sendAuthRequestStub
-      let mockClient = {}
+      const mockClient = {}
 
       return auth.validateOrSendAuthRequest(mockClient)
         .then(() => {
@@ -316,8 +316,8 @@ describe('SolidAuthOIDC', () => {
 
   describe('initUserFromResponse()', () => {
     it('should validate the auth response', () => {
-      let aliceWebId = 'https://alice.example.com/'
-      let authResponse = {
+      const aliceWebId = 'https://alice.example.com/'
+      const authResponse = {
         authorization: {
           id_token: 'sample.id.token',
           access_token: 'sample.access.token'
@@ -326,8 +326,8 @@ describe('SolidAuthOIDC', () => {
           sub: aliceWebId
         }
       }
-      let validateResponseStub = sinon.stub().resolves(authResponse)
-      let mockClient = {
+      const validateResponseStub = sinon.stub().resolves(authResponse)
+      const mockClient = {
         validateResponse: validateResponseStub
       }
 
@@ -341,11 +341,11 @@ describe('SolidAuthOIDC', () => {
 
   describe('sendAuthRequest()', () => {
     it('should compose an auth request uri, save provider, and redirect', () => {
-      let state = 'abcd'
-      let providerUri = 'https://provider.example.com'
-      let authUri = `https://provider.example.com/authorize?state=${state}`
-      let createRequestStub = sinon.stub().resolves(authUri)
-      let mockClient = {
+      const state = 'abcd'
+      const providerUri = 'https://provider.example.com'
+      const authUri = `https://provider.example.com/authorize?state=${state}`
+      const createRequestStub = sinon.stub().resolves(authUri)
+      const mockClient = {
         provider: { url: providerUri },
         createRequest: createRequestStub
       }
@@ -362,7 +362,7 @@ describe('SolidAuthOIDC', () => {
 
   describe('currentUser()', () => {
     it('should return cached webId if present', () => {
-      let aliceWebId = 'https://alice.example.com'
+      const aliceWebId = 'https://alice.example.com'
       auth.webId = aliceWebId
 
       expect(auth.currentUser()).to.eventually.equal(aliceWebId)
@@ -373,13 +373,13 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should automatically login if current uri has state param', () => {
-      let state = 'abcd'
-      let providerUri = 'https://provider.example.com'
+      const state = 'abcd'
+      const providerUri = 'https://provider.example.com'
       auth.saveProviderByState(state, providerUri)
 
       auth.window.location.href = `https://client-app.example.com#state=${state}`
-      let aliceWebId = 'https://alice.example.com/'
-      let loginStub = sinon.stub().resolves(aliceWebId)
+      const aliceWebId = 'https://alice.example.com/'
+      const loginStub = sinon.stub().resolves(aliceWebId)
       auth.login = loginStub
 
       return auth.currentUser()
@@ -394,7 +394,7 @@ describe('SolidAuthOIDC', () => {
     it('should return null if no current client', () => {
       auth.currentClient = null
 
-      let url = auth.providerEndSessionEndpoint()
+      const url = auth.providerEndSessionEndpoint()
 
       expect(url).to.equal(null)
     })
@@ -402,7 +402,7 @@ describe('SolidAuthOIDC', () => {
     it('should return null if current client has no provider', () => {
       auth.currentClient = {}
 
-      let url = auth.providerEndSessionEndpoint()
+      const url = auth.providerEndSessionEndpoint()
 
       expect(url).to.equal(null)
     })
@@ -410,7 +410,7 @@ describe('SolidAuthOIDC', () => {
     it('should return null if current provider has no configuration', () => {
       auth.currentClient = { provider: {} }
 
-      let url = auth.providerEndSessionEndpoint()
+      const url = auth.providerEndSessionEndpoint()
 
       expect(url).to.equal(null)
     })
@@ -418,7 +418,7 @@ describe('SolidAuthOIDC', () => {
     it('should return null if current configuration has no end session endpoint', () => {
       auth.currentClient = { provider: { configuration: {} } }
 
-      let url = auth.providerEndSessionEndpoint()
+      const url = auth.providerEndSessionEndpoint()
 
       expect(url).to.equal(null)
     })
@@ -427,12 +427,12 @@ describe('SolidAuthOIDC', () => {
       auth.currentClient = {
         provider: {
           configuration: {
-            'end_session_endpoint': 'https://example.com/logout'
+            end_session_endpoint: 'https://example.com/logout'
           }
         }
       }
 
-      let url = auth.providerEndSessionEndpoint()
+      const url = auth.providerEndSessionEndpoint()
 
       expect(url).to.equal('https://example.com/logout')
     })
@@ -440,7 +440,7 @@ describe('SolidAuthOIDC', () => {
 
   describe('clearAuthResponseFromUrl()', () => {
     it('should replace the current url with a no-hash cleared one', () => {
-      let clearedUrl = 'https://rp.com'
+      const clearedUrl = 'https://rp.com'
 
       auth.currentLocationNoHash = sinon.stub().returns(clearedUrl)
       auth.replaceCurrentUrl = sinon.stub()
@@ -453,21 +453,21 @@ describe('SolidAuthOIDC', () => {
 
   describe('replaceCurrentUrl()', () => {
     it('should do nothing if no window history present', () => {
-      let auth = new SolidAuthOIDC()
+      const auth = new SolidAuthOIDC()
       auth.window = {}
 
       expect(() => { auth.replaceCurrentUrl() }).to.not.throw()
     })
 
     it('should invoke replaceState() on window history with new url', () => {
-      let auth = new SolidAuthOIDC()
+      const auth = new SolidAuthOIDC()
       auth.window = {
         history: {
           replaceState: sinon.stub()
         }
       }
 
-      let clearedUrl = 'https://example.com'
+      const clearedUrl = 'https://example.com'
       auth.currentLocationNoHash = sinon.stub().returns(clearedUrl)
 
       auth.replaceCurrentUrl()
@@ -476,21 +476,21 @@ describe('SolidAuthOIDC', () => {
 
   describe('currentLocationNoHash()', () => {
     it('should return null if no current location', () => {
-      let auth = new SolidAuthOIDC()
+      const auth = new SolidAuthOIDC()
 
-      let url = auth.currentLocationNoHash()
+      const url = auth.currentLocationNoHash()
 
       expect(url).to.equal(null)
     })
 
     it('should return the current location with cleared hash fragment', () => {
-      let auth = new SolidAuthOIDC()
+      const auth = new SolidAuthOIDC()
 
-      let currentUrl = 'https://example.com/#whatever'
+      const currentUrl = 'https://example.com/#whatever'
 
       auth.currentLocation = sinon.stub().returns(currentUrl)
 
-      let url = auth.currentLocationNoHash()
+      const url = auth.currentLocationNoHash()
 
       expect(url).to.equal('https://example.com/')
     })
@@ -506,9 +506,9 @@ describe('SolidAuthOIDC', () => {
     })
 
     it('should invoke PoPToken.issueFor', () => {
-      let auth = new SolidAuthOIDC()
-      let uri = 'https://rs.com'
-      let session = {}
+      const auth = new SolidAuthOIDC()
+      const uri = 'https://rs.com'
+      const session = {}
 
       return auth.issuePoPTokenFor(uri, session)
         .then(() => {
