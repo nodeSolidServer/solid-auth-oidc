@@ -26,7 +26,7 @@
  */
 'use strict'
 const RelyingParty = require('@solid/oidc-rp')
-const PoPToken = require('@solid/oidc-rp/lib/PoPToken')
+const PoPToken = require('@solid/oidc-rp/src/PoPToken')
 const providerSelectPopupSource = require('./provider-select-popup')
 
 // URI parameter types
