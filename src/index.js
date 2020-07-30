@@ -524,6 +524,7 @@ class ClientAuthOIDC {
     if (!event || !event.data) { return }
     switch (event.data.event_type) {
       case 'providerSelected':
+        // eslint-disable-next-line no-case-declarations
         const providerUri = event.data.value
         console.log('Provider selected: ', providerUri)
         this.login(providerUri)

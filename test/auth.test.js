@@ -1,4 +1,5 @@
 'use strict'
+/* global describe, it, beforeEach, before, after */
 
 global.URL = require('whatwg-url').URL
 global.URLSearchParams = require('whatwg-url').URLSearchParams
@@ -60,8 +61,7 @@ describe('SolidAuthOIDC', () => {
     it('should validate a loaded client for a given provider uri', () => {
       const mockClient = {}
 
-      const loadOrRegisterClient = sinon.stub(auth, 'loadOrRegisterClient')
-        .resolves(mockClient)
+      sinon.stub(auth, 'loadOrRegisterClient').resolves(mockClient)
 
       const validateStub = sinon.stub(auth, 'validateOrSendAuthRequest')
 
