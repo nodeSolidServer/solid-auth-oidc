@@ -56,7 +56,7 @@
   },
   "homepage": "https://github.com/solid/solid-auth-oidc",
   "dependencies": {
-    "@solid/oidc-rp": "^0.11.4"
+    "@solid/oidc-rp": "^0.11.5"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
@@ -69,10 +69,10 @@
     "localstorage-memory": "^1.0.3",
     "mocha": "^8.2.1",
     "nyc": "^15.1.0",
-    "sinon": "^9.2.1",
+    "sinon": "^9.2.4",
     "sinon-chai": "^3.5.0",
     "standard": "^16.0.3",
-    "webpack": "^5.9.0",
+    "webpack": "^5.18.0",
     "whatwg-url": "^8.4.0"
   },
   "standard": {
