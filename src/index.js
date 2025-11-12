@@ -510,7 +510,8 @@ class ClientAuthOIDC {
       defaults: {
         authenticate: {
           redirect_uri: redirectUri,
-          response_type: 'id_token token'
+          response_type: 'id_token token',
+          scope: options.scope || 'openid profile'
         }
       },
       store: this.store
