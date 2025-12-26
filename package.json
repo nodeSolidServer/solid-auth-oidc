@@ -1,6 +1,6 @@
 {
   "name": "@solid/solid-auth-oidc",
-  "version": "0.5.8",
+  "version": "0.6.0",
   "engines": {
     "node": ">= 6.0"
   },
@@ -56,7 +56,7 @@
   },
   "homepage": "https://github.com/node-solid-server/solid-auth-oidc",
   "dependencies": {
-    "@solid/oidc-rp": "^0.11.10"
+    "@solid/oidc-rp": "^0.12.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.3",
@@ -72,7 +72,7 @@
     "sinon": "^9.2.4",
     "sinon-chai": "^3.7.0",
     "standard": "^17.1.2",
-    "webpack": "^5.104.0",
+    "webpack": "^5.104.1",
     "whatwg-url": "^15.1.0"
   },
   "standard": {
